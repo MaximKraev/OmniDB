@@ -1,13 +1,26 @@
 /*
-Copyright 2015-2017 The OmniDB Team
+The MIT License (MIT)
 
-This file is part of OmniDB.
+Portions Copyright (c) 2015-2019, The OmniDB Team
+Portions Copyright (c) 2017-2019, 2ndQuadrant Limited
 
-OmniDB is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-OmniDB is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-You should have received a copy of the GNU General Public License along with OmniDB. If not, see http://www.gnu.org/licenses/.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 */
 
 /// <summary>
@@ -258,6 +271,7 @@ function listNodes() {
 				var container = v_div_result;
 				v_nodes_data.ht = new Handsontable(container,
 														{
+															licenseKey: 'non-commercial-and-evaluation',
 															data: p_return.v_data.v_data,
 															columns : columnProperties,
 															colHeaders : true,
@@ -424,6 +438,7 @@ function listAlerts(p_node_id) {
 				var container = v_div_result;
 				v_alerts_data.ht = new Handsontable(container,
 														{
+															licenseKey: 'non-commercial-and-evaluation',
 															data: p_return.v_data.v_data,
 															columns : columnProperties,
 															colHeaders : true,
@@ -680,6 +695,7 @@ function listAlertData(p_alert_id) {
 				var container = v_div_result;
 				v_curr_alert_data.ht = new Handsontable(container,
 														{
+															licenseKey: 'non-commercial-and-evaluation',
 															data: p_return.v_data.v_data,
 															columns : columnProperties,
 															colHeaders : true,
@@ -695,7 +711,7 @@ function listAlertData(p_alert_id) {
 
 																},
 																items: {
-																	"view_data": {name: '<div style=\"position: absolute;\"><img class="img_ht" src=\"/static/OmniDB_app/images/rename.png\"></div><div style=\"padding-left: 30px;\">View Content</div>'}
+																	"view_data": {name: '<div style=\"position: absolute;\"><i class=\"fas fa-edit cm-all\" style=\"vertical-align: middle;\"></i></div><div style=\"padding-left: 30px;\">View Content</div>'}
 																}
 													    },
 															cells: function (row, col, prop) {
@@ -869,7 +885,7 @@ function editCellData(p_ht, p_row, p_col, p_content, p_can_alter) {
 	v_editContentObject.col = p_col;
 	v_editContentObject.ht = p_ht;
 
-	$('#div_edit_content').show();
+	$('#div_edit_content').addClass('isActive');
 
 }
 
@@ -878,7 +894,7 @@ function editCellData(p_ht, p_row, p_col, p_content, p_can_alter) {
 /// </summary>
 function hideEditContent() {
 
-	$('#div_edit_content').hide();
+	$('#div_edit_content').removeClass('isActive');
 
 	v_editContentObject.editor.setValue('');
 

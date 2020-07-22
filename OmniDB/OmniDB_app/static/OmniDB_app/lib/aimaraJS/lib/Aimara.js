@@ -91,16 +91,18 @@ function createTree(p_div,p_backColor,p_contextMenu) {
 					if (p_parentNode.childNodes.length==0) {
 						if (p_parentNode.expanded) {
 						p_parentNode.elementLi.getElementsByTagName("ul")[0].style.display = 'block';
-						var v_img = p_parentNode.elementLi.getElementsByTagName("img")[0];
+						var v_img = p_parentNode.elementLi.getElementsByTagName("i")[0];
 						v_img.style.visibility = "visible";
-						v_img.src = '/static/OmniDB_app/images/collapse.png';
+						v_img.classList.remove('aimara-expand');
+						v_img.classList.add('aimara-collapse');
 						v_img.id = 'toggle_off';
 						}
 						else {
 							p_parentNode.elementLi.getElementsByTagName("ul")[0].style.display = 'none';
-							var v_img = p_parentNode.elementLi.getElementsByTagName("img")[0];
+							var v_img = p_parentNode.elementLi.getElementsByTagName("i")[0];
 							v_img.style.visibility = "visible";
-							v_img.src = '/static/OmniDB_app/images/expand.png';
+							v_img.classList.add('aimara-expand');
+							v_img.classList.remove('aimara-collapse');
 							v_img.id = 'toggle_on';
 						}
 					}
@@ -145,16 +147,18 @@ function createTree(p_div,p_backColor,p_contextMenu) {
 			if (p_node.childNodes.length>0) {
 				if (p_node.expanded) {
 				p_node.elementLi.getElementsByTagName("ul")[0].style.display = 'block';
-				var v_img = p_node.elementLi.getElementsByTagName("img")[0];
+				var v_img = p_node.elementLi.getElementsByTagName("i")[0];
 				v_img.style.visibility = "visible";
-				v_img.src = '/static/OmniDB_app/images/collapse.png';
+				v_img.classList.remove('aimara-expand');
+				v_img.classList.add('aimara-collapse');
 				v_img.id = 'toggle_off';
 				}
 				else {
 					p_node.elementLi.getElementsByTagName("ul")[0].style.display = 'none';
-					var v_img = p_node.elementLi.getElementsByTagName("img")[0];
+					var v_img = p_node.elementLi.getElementsByTagName("i")[0];
 					v_img.style.visibility = "visible";
-					v_img.src = '/static/OmniDB_app/images/expand.png';
+					v_img.classList.add('aimara-expand');
+					v_img.classList.remove('aimara-collapse');
 					v_img.id = 'toggle_on';
 				}
 
@@ -196,8 +200,9 @@ function createTree(p_div,p_backColor,p_contextMenu) {
 			var v_icon = null;
 
 			if (p_node.icon!=null)
-				v_icon = createSimpleElement('span',null,'icon_tree');
-				v_icon.style.backgroundImage = 'url(' + p_node.icon + ')';
+				v_icon = createSimpleElement('i',null,'icon_tree ' + p_node.icon);
+				//v_icon.innerHTML = '<i class="' + p_node.icon + '" style="display: block;"></i>';
+				//v_icon.style.backgroundImage = 'url(' + p_node.icon + ')';
 
 			var v_li = document.createElement('li');
 			p_node.elementLi = v_li;
@@ -207,15 +212,15 @@ function createTree(p_div,p_backColor,p_contextMenu) {
 			var v_exp_col = null;
 
 			if (p_node.childNodes.length == 0) {
-				v_exp_col = createImgElement('toggle_off','exp_col','/static/OmniDB_app/images/collapse.png');
+				v_exp_col = createSimpleElement('i','toggle_off','exp_col aimara-collapse');
 				v_exp_col.style.visibility = "hidden";
 			}
 			else {
 				if (p_node.expanded) {
-					v_exp_col = createImgElement('toggle_off','exp_col','/static/OmniDB_app/images/collapse.png');
+					v_exp_col = createSimpleElement('i','toggle_off','exp_col aimara-collapse');
 				}
 				else {
-					v_exp_col = createImgElement('toggle_on','exp_col','/static/OmniDB_app/images/expand.png');
+					v_exp_col = createSimpleElement('i','toggle_on','exp_col aimara-expand');
 				}
 			}
 
@@ -343,12 +348,12 @@ function createTree(p_div,p_backColor,p_contextMenu) {
 				if (this.nodeBeforeOpenEvent!=undefined)
 					this.nodeBeforeOpenEvent(p_node);
 
-				var img=p_node.elementLi.getElementsByTagName("img")[0];
-
+				var img=p_node.elementLi.getElementsByTagName("i")[0];
 				p_node.expanded = true;
 
 				img.id="toggle_off";
-				img.src = '/static/OmniDB_app/images/collapse.png';
+				img.classList.remove('aimara-expand');
+				img.classList.add('aimara-collapse');
 				elem_ul = img.parentElement.getElementsByTagName("ul")[0];
 				elem_ul.style.display = 'block';
 
@@ -360,14 +365,14 @@ function createTree(p_div,p_backColor,p_contextMenu) {
 		// p_node: Reference to the node;
 		collapseNode: function(p_node) {
 			if (p_node.childNodes.length>0 && p_node.expanded==true) {
-				var img=p_node.elementLi.getElementsByTagName("img")[0];
+				var img=p_node.elementLi.getElementsByTagName("i")[0];
 
 				p_node.expanded = false;
 				if (this.nodeBeforeCloseEvent!=undefined)
 					this.nodeBeforeCloseEvent(p_node);
 
-				img.id="toggle_on";
-				img.src = '/static/OmniDB_app/images/expand.png';
+				img.classList.add('aimara-expand');
+				img.classList.remove('aimara-collapse');
 				elem_ul = img.parentElement.getElementsByTagName("ul")[0];
 				elem_ul.style.display = 'none';
 
@@ -424,7 +429,7 @@ function createTree(p_div,p_backColor,p_contextMenu) {
 			p_node.parent.childNodes.splice(index, 1);
 
 			if (p_node.parent.childNodes.length==0) {
-				var v_img = p_node.parent.elementLi.getElementsByTagName("img")[0];
+				var v_img = p_node.parent.elementLi.getElementsByTagName("i")[0];
 				v_img.style.visibility = "hidden";
 			}
 
@@ -436,7 +441,7 @@ function createTree(p_div,p_backColor,p_contextMenu) {
 			if (p_node.childNodes.length>0) {
 				var v_ul = p_node.elementLi.getElementsByTagName("ul")[0];
 
-				var v_img = p_node.elementLi.getElementsByTagName("img")[0];
+				var v_img = p_node.elementLi.getElementsByTagName("i")[0];
 				v_img.style.visibility = "hidden";
 
 				p_node.childNodes = [];
@@ -450,7 +455,11 @@ function createTree(p_div,p_backColor,p_contextMenu) {
 			var v_items_list = [];
 			if (p_node.contextMenu!=undefined) {
 				try {
-						var v_menu_list = this.contextMenu[p_node.contextMenu].elements;
+						var v_menu_list = null;
+						if (typeof(this.contextMenu[p_node.contextMenu].elements)=='function')
+							v_menu_list = this.contextMenu[p_node.contextMenu].elements(p_node);
+						else
+							v_menu_list = this.contextMenu[p_node.contextMenu].elements;
 						v_items_list = v_items_list.concat(v_menu_list);
 				}
 				catch(err) {
@@ -528,9 +537,9 @@ function createTree(p_div,p_backColor,p_contextMenu) {
 						v_a.appendChild(document.createTextNode(v_items_list[i].text));
 
 						v_li.appendChild(v_span);
-
 						if (v_items_list[i].icon!=undefined) {
-							var v_img = createImgElement('null','null',v_items_list[i].icon);
+							var v_img = createSimpleElement('i',null,v_items_list[i].icon);
+							v_img.innerHTML = '&nbsp;';
 							v_li.appendChild(v_img);
 						}
 
@@ -551,7 +560,7 @@ function createTree(p_div,p_backColor,p_contextMenu) {
 
 							v_li.appendChild(v_ul);
 							var v_span_more = createSimpleElement('div',null,null);
-							v_span_more.appendChild(createImgElement(null,'menu_img','/static/OmniDB_app/images/right.png'));
+							v_span_more.appendChild(createImgElement(null,'menu_img',v_url_folder + '/static/OmniDB_app/images/right.png'));
 							v_li.appendChild(v_span_more);
 							v_tree.contextMenuLi(v_items_list[i].submenu,v_ul,p_node,v_closediv, 1);
 						}
@@ -570,7 +579,13 @@ function createTree(p_div,p_backColor,p_contextMenu) {
 
 			var v_tree = this;
 
-			for (var i=0; i<p_submenu.elements.length; i++) (function(i){
+			var v_menu_list = null;
+			if (typeof(p_submenu.elements)=='function')
+				v_menu_list = p_submenu.elements(p_node);
+			else
+				v_menu_list = p_submenu.elements;
+
+			for (var i=0; i<v_menu_list.length; i++) (function(i){
 
 				var v_li = createSimpleElement('li',null,null);
 				v_li.aimara_level = p_level;
@@ -584,20 +599,21 @@ function createTree(p_div,p_backColor,p_contextMenu) {
 					}
 					p_closediv.parentNode.removeChild(p_closediv);
 
-					if (p_submenu.elements[i].action!=null)
-						p_submenu.elements[i].action(p_node)
+					if (v_menu_list[i].action!=null)
+						v_menu_list[i].action(p_node)
 				};
 
 				var v_a = createSimpleElement('a',null,null);
 				var v_ul = createSimpleElement('ul',null,'aimara_sub-menu');
 				v_ul.aimara_level = p_level;
 
-				v_a.appendChild(document.createTextNode(p_submenu.elements[i].text));
+				v_a.appendChild(document.createTextNode(v_menu_list[i].text));
 
 				v_li.appendChild(v_span);
 
-				if (p_submenu.elements[i].icon!=undefined) {
-					var v_img = createImgElement('null','null',p_submenu.elements[i].icon);
+				if (v_menu_list[i].icon!=undefined) {
+					var v_img = createSimpleElement('i',null,v_menu_list[i].icon);
+					v_img.innerHTML = '&nbsp;';
 					v_li.appendChild(v_img);
 				}
 
@@ -605,7 +621,7 @@ function createTree(p_div,p_backColor,p_contextMenu) {
 
 				p_ul.appendChild(v_li);
 
-				if (p_submenu.elements[i].submenu!=undefined) {
+				if (v_menu_list[i].submenu!=undefined) {
 
 					v_li.onmouseenter = function() {
 						var v_submenus = document.getElementsByClassName("aimara_sub-menu");
@@ -618,9 +634,9 @@ function createTree(p_div,p_backColor,p_contextMenu) {
 
 					v_li.appendChild(v_ul);
 					var v_span_more = createSimpleElement('div',null,null);
-					v_span_more.appendChild(createImgElement(null,'menu_img','/static/OmniDB_app/images/right.png'));
+					v_span_more.appendChild(createImgElement(null,'menu_img',v_url_folder + '/static/OmniDB_app/images/right.png'));
 					v_li.appendChild(v_span_more);
-					v_tree.contextMenuLi(p_submenu.elements[i].submenu,v_ul,p_node,p_closediv, p_level+1);
+					v_tree.contextMenuLi(v_menu_list[i].submenu,v_ul,p_node,p_closediv, p_level+1);
 				}
 
 			})(i);

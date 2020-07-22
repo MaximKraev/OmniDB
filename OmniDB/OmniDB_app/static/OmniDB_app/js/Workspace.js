@@ -1,13 +1,26 @@
 /*
-Copyright 2015-2017 The OmniDB Team
+The MIT License (MIT)
 
-This file is part of OmniDB.
+Portions Copyright (c) 2015-2019, The OmniDB Team
+Portions Copyright (c) 2017-2019, 2ndQuadrant Limited
 
-OmniDB is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-OmniDB is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-You should have received a copy of the GNU General Public License along with OmniDB. If not, see http://www.gnu.org/licenses/.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 */
 
 var v_browserTabActive = true;
@@ -33,7 +46,37 @@ $(function () {
 
 
 	v_connTabControl.tag.createSnippetTab();
-//	v_connTabControl.tag.createWebsiteOuterTab(v_short_version,'/welcome');
+	if (false) {
+		v_connTabControl.tag.createWebsiteOuterTab(v_short_version,null,
+		`
+		<div class="welcome_release_content">
+	    <h2>Release notes</h2>
+	    <div class="welcome_release_container">
+	      <ul class="welcome_release_list">
+
+					<li class="welcome_release_item"><span>Support to PostgreSQL 12.</span></li>
+					<li class="welcome_release_item"><span>Table DDL panel shows generated columns.</span></li>
+					<li class="welcome_release_item"><span>Added SQL template for Cluster Index, accessible from context menu in TreeView.</span></li>
+					<li class="welcome_release_item"><span>Added Advanced Object Search as an option in Inner Tab context menu.</span></li>
+					<li class="welcome_release_item"><span>Fixed: Server ping causing peaks of false positives in moments of brief network interruption or idle activities, or when the notebook running OmniDB was put to sleep.</span></li>
+					<li class="welcome_release_item"><span>Fixed: High CPU usage when SSH console is being used and tunnel gets closed.</span></li>
+					<li class="welcome_release_item"><span>Fixed: Render issue with graph chart type.</span></li>
+					<li class="welcome_release_item"><span>Fixed: Permission issue to install OmniDB plugins on Linux.</span></li>
+
+	      </ul>
+	    </div>
+	  </div>
+		`,
+		function() {
+			execAjax('/close_welcome/',
+					JSON.stringify({}),
+					function(p_return) {
+					},
+					null,
+					'box',
+					false);
+		});
+	}
 
 	//v_connTabControl.tag.createServerMonitoringTab();
 
@@ -82,6 +125,21 @@ $(function () {
 	  e.preventDefault();
 	},false);
 
+	/*window.addEventListener("paste",function(e){
+	});*/
+
+	window.addEventListener("focus", function(event)
+	{
+		if (v_connTabControl.selectedTab.tag.mode=='connection') {
+			if (v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.mode=='query')
+				v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.editor.focus();
+			else if (v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.mode=='console')
+				v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.editor_input.focus();
+			else if (v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.mode=='edit')
+				v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.editor.focus();
+		}
+	}, false);
+
 /*
 	//WebSockets
 	startChatWebSocket(2011, v_enable_omnichat);
@@ -91,6 +149,9 @@ $(function () {
 	}
 */
 	startQueryWebSocket();
+
+	//Loading Xterm Fit Addon
+	Terminal.applyAddon(fit);
 });
 
 /// <summary>
@@ -106,6 +167,10 @@ function getDatabaseList(p_init, p_callback) {
 
 				v_connTabControl.tag.selectHTML = p_return.v_data.v_select_html;
 				v_connTabControl.tag.connections = p_return.v_data.v_connections;
+
+				v_connTabControl.tag.selectGroupHTML = p_return.v_data.v_select_group_html;
+				v_connTabControl.tag.groups = p_return.v_data.v_groups;
+				v_connTabControl.tag.remote_terminals = p_return.v_data.v_remote_terminals;
 
 				if (p_init) {
 
@@ -126,7 +191,7 @@ function getDatabaseList(p_init, p_callback) {
 							}
 
 							v_current_parent = p_return.v_data.v_existing_tabs[i].index;
-							v_connTabControl.tag.createQueryTab('Query',p_return.v_data.v_existing_tabs[i].tab_db_id);
+							v_connTabControl.tag.createQueryTab(p_return.v_data.v_existing_tabs[i].title,p_return.v_data.v_existing_tabs[i].tab_db_id);
 					    v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.editor.setValue(
 					        p_return.v_data.v_existing_tabs[i].snippet);
 							v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.editor.clearSelection();
@@ -138,23 +203,13 @@ function getDatabaseList(p_init, p_callback) {
 
 					}
 					else {
-						var qtip = $('#menu_connections').qtip({
-				        content: {
-				            text: 'Create your first connection!'
-				        },
-				        position: {
-				            my: 'top left',
-				            at: 'bottom right'
-				        },
-				        style: {
-				            classes: 'qtip-bootstrap'
-				        },
-				        show: {
-				            ready: true
-				        }
-				    })
+						var v_instance = new Tooltip($('#menu_connections'),{
+					    title: 'Create your first connection!',
+					    placement: "bottom",
+					  });
+						v_instance.show();
 				    window.setTimeout(function() {
-				        qtip.qtip('api').destroy();
+				        v_instance.dispose();
 				    }, 4000);
 					}
 
@@ -194,7 +249,6 @@ function checkBeforeChangeDatabase(p_cancel_function, p_ok_function) {
 /// <summary>
 /// Changing selected database.
 /// </summary>
-/// <param name="p_sel_id">Selection tag ID.</param>
 /// <param name="p_value">Database ID.</param>
 function changeDatabase(p_value) {
 
@@ -223,8 +277,13 @@ function changeDatabase(p_value) {
 			v_connTabControl.selectedTab.tag.consoleHelp = v_conn_object.v_console_help;
 			v_connTabControl.selectedTab.tag.selectedDatabase = v_conn_object.v_database;
 			v_connTabControl.selectedTab.tag.dd_selected_index = v_connTabControl.selectedTab.tag.dd_object.selectedIndex;
+			v_connTabControl.selectedTab.tag.selectedTitle = v_conn_object.v_alias;
 
-			v_connTabControl.selectedTab.tag.tabTitle.innerHTML = '<img src="/static/OmniDB_app/images/' + v_conn_object.v_db_type + '_medium.png"/> ' + v_conn_object.v_alias;
+			if (v_connTabControl.selectedTab.tag.selectedTitle!='')
+				v_connTabControl.selectedTab.tag.tabTitle.innerHTML = '<img src="' + v_url_folder + '/static/OmniDB_app/images/' + v_connTabControl.selectedTab.tag.selectedDBMS + '_medium.png"/> ' + v_connTabControl.selectedTab.tag.selectedTitle + ' - ' + v_connTabControl.selectedTab.tag.selectedDatabase;
+			else
+				v_connTabControl.selectedTab.tag.tabTitle.innerHTML = '<img src="' + v_url_folder + '/static/OmniDB_app/images/' + v_connTabControl.selectedTab.tag.selectedDBMS + '_medium.png"/> ' + v_connTabControl.selectedTab.tag.selectedDatabase;
+
 
 			queueChangeActiveDatabaseThreadSafe({
 					"p_database_index": v_connTabControl.selectedTab.tag.selectedDatabaseIndex,
@@ -246,6 +305,91 @@ function changeDatabase(p_value) {
 			adjustQueryTabObjects(true);
 		});
 
+}
+
+function changeGroup(p_value, p_tab_tag) {
+
+	var v_tag = v_connTabControl.selectedTab.tag;
+	if (p_tab_tag!=null)
+		v_tag = p_tab_tag;
+
+	//finding group object
+	var v_group_object = null;
+	for (var i=0; i<v_connTabControl.tag.groups.length; i++) {
+		if (p_value==v_connTabControl.tag.groups[i].v_group_id) {
+			v_group_object = v_connTabControl.tag.groups[i];
+			break;
+		}
+	}
+	if (!v_group_object) {
+		v_group_object = v_connTabControl.tag.groups[0];
+		v_tag.divSelectGroup.childNodes[0].value = 0;
+	}
+
+	v_tag.selectedGroupIndex = parseInt(p_value);
+
+  //check if next group contains the currently selected connection
+	var v_found = false;
+	//first group contains all connections
+	if (v_group_object.v_group_id==0) {
+		v_found = true;
+	}
+	else {
+		for (var i=0; i<v_group_object.conn_list.length; i++) {
+			if (v_tag.selectedDatabaseIndex==v_group_object.conn_list[i]) {
+				v_found = true;
+				break;
+			}
+		}
+	}
+
+	//not found, check if there aren't troublesome tabs before changing selector
+	if (!v_found) {
+		for (var i=0; i < v_tag.tabControl.tabList.length; i++) {
+
+			var v_tab = v_tag.tabControl.tabList[i];
+			if (v_tab.tag!=null)
+				if (v_tab.tag.mode=='edit' || v_tab.tag.mode=='alter' || v_tab.tag.mode=='debug' || v_tab.tag.mode=='monitor_dashboard' || v_tab.tag.mode=='data_mining') {
+					showAlert("Before changing group please close any tab of the selected connection that belongs to the following types: <br/><br/><b>Edit Data<br/><br/>Alter Table<br/><br/>Function Debugging<br/><br/>Monitoring Dashboard<br/><br/>Advanced Object Search.");
+					v_tag.dd_group_object.set("selectedIndex",v_tag.dd_group_selected_index);
+					return null;
+				}
+		}
+	}
+
+	//Filtering connection list
+	v_tag.divSelectDB.innerHTML = v_connTabControl.tag.selectHTML;
+	var v_select = v_tag.divSelectDB.childNodes[0];
+
+	//filter if not default group
+	if (v_group_object.v_group_id!=0) {
+		for (var i=v_select.childNodes.length-1; i>=0; i--) {
+			var v_option = v_select.childNodes[i];
+
+			var v_found_conn = false;
+			for (var j=0; j<v_group_object.conn_list.length; j++) {
+				if (v_option.value==v_group_object.conn_list[j]) {
+					v_found_conn = true;
+					if (!v_found) {
+						changeDatabase(v_option.value);
+						v_found = true;
+					}
+					break;
+				}
+			}
+			if (!v_found_conn) {
+				v_option.parentNode.removeChild(v_option);
+			}
+		}
+	}
+
+	//Rebuild selector
+	v_tag.divSelectDB.childNodes[0].value = v_tag.selectedDatabaseIndex;
+	v_tag.dd_object = $(v_tag.divSelectDB.childNodes[0]).msDropDown().data("dd");
+	v_tag.dd_selected_index = v_tag.dd_object.selectedIndex;
+
+
+	v_tag.dd_group_selected_index = v_tag.dd_group_object.selectedIndex;
 }
 
 function queueChangeActiveDatabaseThreadSafe(p_data) {
@@ -281,6 +425,14 @@ function renameTab(p_tab) {
 					renameTabConfirm(p_tab,document.getElementById('tab_name').value);
 
 	            });
+	var v_input = document.getElementById('tab_name');
+	v_input.onkeydown = function() {
+		if (event.keyCode == 13)
+			document.getElementById('button_confirm_ok').click();
+		else if (event.keyCode == 27)
+			document.getElementById('button_confirm_cancel').click();
+	}
+	document.getElementById('tab_name').focus();
 
 }
 
@@ -309,7 +461,7 @@ function removeTab(p_tab) {
 	if (p_tab.tag.editor!=null)
 		p_tab.tag.editor.destroy();
 
-	if (p_tab.tag.mode=='query' || p_tab.tag.mode=='edit' || p_tab.tag.mode=='console') {
+	if (p_tab.tag.mode=='query' || p_tab.tag.mode=='edit' || p_tab.tag.mode=='console' || p_tab.tag.mode=='outer_terminal') {
 		var v_message_data = { tab_id: p_tab.tag.tab_id, tab_db_id: null };
 		if (p_tab.tag.mode=='query')
 			v_message_data.tab_db_id = p_tab.tag.tab_db_id;
@@ -329,6 +481,7 @@ function verticalLinePosition(p_event) {
 
 function resizeWindow(){
 	refreshHeights(true);
+
 }
 
 var resizeTimeout;
@@ -341,15 +494,19 @@ function refreshTreeHeight() {
 	var v_tag = v_connTabControl.selectedTab.tag;
 
 	if (v_tag.currTreeTab=='properties') {
-		var v_height  = window.innerHeight - $(v_tag.divProperties).offset().top - 21;
+		var v_height  = window.innerHeight - $(v_tag.divProperties).offset().top - 8;
 		v_tag.divProperties.style.height = v_height + "px";
 		v_tag.gridProperties.render();
 		v_tag.gridProperties.render();
 	}
 	else if (v_tag.currTreeTab=='ddl') {
-		var v_height  = window.innerHeight - $(v_tag.divDDL).offset().top - 21;
+		var v_height  = window.innerHeight - $(v_tag.divDDL).offset().top - 8;
 		v_tag.divDDL.style.height = v_height + "px";
 		v_tag.ddlEditor.resize();
+	}
+	else if (v_tag.mode=='snippets') {
+		var v_height  = window.innerHeight - $(v_tag.divTree).offset().top;
+		v_tag.divTree.style.height = v_height + "px";
 	}
 
 }
@@ -368,6 +525,11 @@ function refreshHeights(p_all) {
 	if (v_connTabControl.selectedTab.tag.mode=='monitor_all') {
 		v_connTabControl.selectedTab.tag.tabControlDiv.style.height = window.innerHeight - $(v_connTabControl.selectedTab.tag.tabControlDiv).offset().top - 18 + 'px';
 	}
+	else if (v_connTabControl.selectedTab.tag.mode=='outer_terminal') {
+		v_connTabControl.selectedTab.tag.div_console.style.height = window.innerHeight - $(v_connTabControl.selectedTab.tag.div_console).offset().top - 10 + 'px';
+		v_connTabControl.selectedTab.tag.editor_console.fit();
+
+	}
 
 	//If inner tab exists
 	if (v_connTabControl.selectedTab.tag.tabControl != null && v_connTabControl.selectedTab.tag.tabControl.selectedTab) {
@@ -375,11 +537,11 @@ function refreshHeights(p_all) {
 
 		//Snippet tab, adjust editor only
 		if (v_tab_tag.mode=='snippet') {
-			v_tab_tag.editorDiv.style.height = window.innerHeight - $(v_tab_tag.editorDiv).offset().top - 62 + 'px';
+			v_tab_tag.editorDiv.style.height = window.innerHeight - $(v_tab_tag.editorDiv).offset().top - 42 + 'px';
 			v_tab_tag.editor.resize();
 		}
 		else if (v_tab_tag.mode=='monitor_unit') {
-			var v_new_height = window.innerHeight - $(v_tab_tag.editorDataDiv).offset().top - 324 + 'px';
+			var v_new_height = window.innerHeight - $(v_tab_tag.editorDataDiv).offset().top - 364 + 'px';
 			v_tab_tag.editorDiv.style.height = v_new_height;
 			v_tab_tag.editorDataDiv.style.height = v_new_height;
 			v_tab_tag.editor.resize();
@@ -387,45 +549,46 @@ function refreshHeights(p_all) {
 		}
 		else if (v_tab_tag.mode=='query') {
 			if (v_tab_tag.currQueryTab=='data') {
-				v_tab_tag.div_result.style.height = window.innerHeight - $(v_tab_tag.div_result).offset().top - 29 + 'px';
+				v_tab_tag.div_result.style.height = window.innerHeight - $(v_tab_tag.div_result).offset().top - 15 + 'px';
 				if (v_tab_tag.ht!=null)
 					v_tab_tag.ht.render();
 				if(v_tab_tag.editor != null)
 						v_tab_tag.editor.resize();
 			}
 			else if (v_tab_tag.currQueryTab=='message') {
-				v_tab_tag.div_notices.style.height = window.innerHeight - $(v_tab_tag.div_notices).offset().top - 29 + 'px';
+				v_tab_tag.div_notices.style.height = window.innerHeight - $(v_tab_tag.div_notices).offset().top - 15 + 'px';
 			}
 			else if (v_tab_tag.currQueryTab=='explain') {
-				v_tab_tag.div_explain.style.height = window.innerHeight - $(v_tab_tag.div_explain).offset().top - 29 + 'px';
+				v_tab_tag.div_explain.style.height = window.innerHeight - $(v_tab_tag.div_explain).offset().top - 15 + 'px';
 			}
 		}
 		else if (v_tab_tag.mode=='console') {
-			v_tab_tag.div_console.style.height = window.innerHeight - $(v_tab_tag.div_console).offset().top - parseInt(v_tab_tag.div_result.style.height,10) - 70 + 'px';
+			v_tab_tag.div_console.style.height = window.innerHeight - $(v_tab_tag.div_console).offset().top - parseInt(v_tab_tag.div_result.style.height,10) - 59 + 'px';
 			v_tab_tag.editor_console.resize();
+			v_tab_tag.editor_input.resize();
 
 		}
 		else if (v_tab_tag.mode=='debug') {
 			if (v_tab_tag.currDebugTab=='variable') {
-				v_tab_tag.div_variable.style.height = window.innerHeight - $(v_tab_tag.div_variable).offset().top - 29 + 'px';
+				v_tab_tag.div_variable.style.height = window.innerHeight - $(v_tab_tag.div_variable).offset().top - 15 + 'px';
 				if (v_tab_tag.htVariable!=null)
 					v_tab_tag.htVariable.render();
 			}
 			else if (v_tab_tag.currDebugTab=='parameter') {
-				v_tab_tag.div_parameter.style.height = window.innerHeight - $(v_tab_tag.div_parameter).offset().top - 29 + 'px';
+				v_tab_tag.div_parameter.style.height = window.innerHeight - $(v_tab_tag.div_parameter).offset().top - 15 + 'px';
 				if (v_tab_tag.htParameter!=null)
 					v_tab_tag.htParameter.render();
 			}
 			else if (v_tab_tag.currDebugTab=='result') {
-				v_tab_tag.div_result.style.height = window.innerHeight - $(v_tab_tag.div_result).offset().top - 29 + 'px';
+				v_tab_tag.div_result.style.height = window.innerHeight - $(v_tab_tag.div_result).offset().top - 15 + 'px';
 				if (v_tab_tag.htResult!=null)
 					v_tab_tag.htResult.render();
 			}
 			else if (v_tab_tag.currDebugTab=='message') {
-				v_tab_tag.div_notices.style.height = window.innerHeight - $(v_tab_tag.div_notices).offset().top - 29 + 'px';
+				v_tab_tag.div_notices.style.height = window.innerHeight - $(v_tab_tag.div_notices).offset().top - 15 + 'px';
 			}
 			else if (v_tab_tag.currDebugTab=='statistics') {
-				v_tab_tag.div_statistics.style.height = window.innerHeight - $(v_tab_tag.div_statistics).offset().top - 29 + 'px';
+				v_tab_tag.div_statistics.style.height = window.innerHeight - $(v_tab_tag.div_statistics).offset().top - 15 + 'px';
 				if (v_tab_tag.chart!=null)
 					v_tab_tag.chart.update();
 			}
@@ -441,41 +604,41 @@ function refreshHeights(p_all) {
 				v_tab_tag.ht.render();
 		}
 		else if (v_tab_tag.mode=='graph') {
-			v_tab_tag.graph_div.style.height = window.innerHeight - $(v_tab_tag.graph_div).offset().top - 20 + "px";
+			v_tab_tag.graph_div.style.height = window.innerHeight - $(v_tab_tag.graph_div).offset().top - 10 + "px";
 
 		}
 		else if (v_tab_tag.mode=='website') {
-			v_tab_tag.iframe.style.height = window.innerHeight - $(v_tab_tag.iframe).offset().top - 20 + "px";
+			v_tab_tag.iframe.style.height = window.innerHeight - $(v_tab_tag.iframe).offset().top - 10 + "px";
 		}
 		else if (v_tab_tag.mode=='website_outer') {
-			v_tab_tag.iframe.style.height = window.innerHeight - $(v_tab_tag.iframe).offset().top - 12 + "px";
+			v_tab_tag.iframe.style.height = window.innerHeight - $(v_tab_tag.iframe).offset().top - 4 + "px";
 		}
 		else if (v_tab_tag.mode=='edit') {
-			v_tab_tag.div_result.style.height = window.innerHeight - $(v_tab_tag.div_result).offset().top - 21 + 'px';
+			v_tab_tag.div_result.style.height = window.innerHeight - $(v_tab_tag.div_result).offset().top - 10 + 'px';
 			if (v_tab_tag.editDataObject.ht!=null) {
 				v_tab_tag.editDataObject.ht.render();
 			}
 		}
 		else if (v_tab_tag.mode=='monitor_dashboard') {
-			v_tab_tag.dashboard_div.style.height = window.innerHeight - $(v_tab_tag.dashboard_div).offset().top - $(v_tab_tag.dashboard_div.parentElement).scrollTop() - 20 + "px";
+			v_tab_tag.dashboard_div.style.height = window.innerHeight - $(v_tab_tag.dashboard_div).offset().top - $(v_tab_tag.dashboard_div.parentElement).scrollTop() - 10 + "px";
 		}
 		else if (v_tab_tag.mode=='alter') {
 			if (v_tab_tag.alterTableObject.window=='columns') {
-				var v_height = window.innerHeight - $(v_tab_tag.htDivColumns).offset().top - 59;
+				var v_height = window.innerHeight - $(v_tab_tag.htDivColumns).offset().top - 45;
 				v_tab_tag.htDivColumns.style.height = v_height + 'px';
 				if (v_tab_tag.alterTableObject.htColumns!=null) {
 					v_tab_tag.alterTableObject.htColumns.render();
 				}
 			}
 			else if (v_tab_tag.alterTableObject.window=='constraints') {
-				var v_height = window.innerHeight - $(v_tab_tag.htDivConstraints).offset().top - 59;
+				var v_height = window.innerHeight - $(v_tab_tag.htDivConstraints).offset().top - 45;
 				v_tab_tag.htDivConstraints.style.height = v_height + 'px';
 				if (v_tab_tag.alterTableObject.htConstraints!=null) {
 					v_tab_tag.alterTableObject.htConstraints.render();
 				}
 			}
 			else {
-				var v_height = window.innerHeight - $(v_tab_tag.htDivIndexes).offset().top - 59;
+				var v_height = window.innerHeight - $(v_tab_tag.htDivIndexes).offset().top - 45;
 				v_tab_tag.htDivIndexes.style.height = v_height + 'px';
 				if (v_tab_tag.alterTableObject.htIndexes!=null) {
 					v_tab_tag.alterTableObject.htIndexes.render();
@@ -484,7 +647,7 @@ function refreshHeights(p_all) {
 		}
 		else if(v_tab_tag.mode == 'data_mining') {
 			if(v_tab_tag.currQueryTab == 'data') {
-				v_tab_tag.div_result.style.height = window.innerHeight - $(v_tab_tag.div_result).offset().top - 29 + 'px';
+				v_tab_tag.div_result.style.height = window.innerHeight - $(v_tab_tag.div_result).offset().top - 15 + 'px';
 			}
 		}
 	}
@@ -541,9 +704,9 @@ function resizeVerticalEnd(event) {
 		if (Math.abs(v_height_diff) > parseInt(v_result_div.style.height, 10))
 		 v_height_diff = parseInt(v_result_div.style.height, 10) - 10;
 	}
-
 	v_editor_div.style.height = parseInt(v_editor_div.style.height, 10) + v_height_diff + 'px';
 	v_result_div.style.height = parseInt(v_result_div.style.height, 10) - v_height_diff + 'px';
+
 
 	var v_tab_tag = v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag;
 
@@ -938,7 +1101,7 @@ function drawGraph(p_all, p_schema) {
 						boxSelectionEnabled: false,
 						autounselectify: true,
 						layout: {
-							name: 'cose',
+							name: 'spread',
 	            			idealEdgeLength: 100,
 	            			nodeOverlap: 20
 						},
@@ -1021,7 +1184,7 @@ function drawGraph(p_all, p_schema) {
 						elements: {
 							nodes: v_nodes,
 							edges: v_edges
-						},
+						}
 					});
 
 			},
@@ -1045,7 +1208,7 @@ function drawGraph(p_all, p_schema) {
 /// </summary>
 function hideCommandsLog() {
 
-	$('#div_commands_log').hide();
+	$('#div_commands_log').removeClass('isActive');
 
 }
 
@@ -1081,7 +1244,7 @@ function refreshMonitoring(p_tab_tag) {
 					for (var i=0; i<v_data.v_data.length; i++) {
 						var v_actions_html = '';
 						for (var j=0; j<p_tab_tag.actions.length; j++) {
-							v_actions_html += '<img class="img_ht" title="' + p_tab_tag.actions[j].title + '" src="' + p_tab_tag.actions[j].icon + '" onclick="monitoringAction(' + i + ',&apos;' + p_tab_tag.actions[j].action + '&apos;)">';
+							v_actions_html += '<i class="' + p_tab_tag.actions[j].icon + '" onclick="monitoringAction(' + i + ',&apos;' + p_tab_tag.actions[j].action + '&apos;)">';
 						}
 						v_data.v_data[i].unshift(v_actions_html);
 					}
@@ -1104,6 +1267,7 @@ function refreshMonitoring(p_tab_tag) {
 
 				p_tab_tag.ht = new Handsontable(p_tab_tag.div_result,
 				{
+					licenseKey: 'non-commercial-and-evaluation',
 					data: v_data.v_data,
 					columns : columnProperties,
 					colHeaders : true,
@@ -1119,9 +1283,14 @@ function refreshMonitoring(p_tab_tag) {
 							if (key === 'view_data') {
 							  	editCellData(this,options[0].start.row,options[0].start.col,this.getDataAtCell(options[0].start.row,options[0].start.col),false);
 							}
+							else if (key === 'copy') {
+								this.selectCell(options[0].start.row,options[0].start.col,options[0].end.row,options[0].end.col);
+								document.execCommand('copy');
+							}
 						},
 						items: {
-							"view_data": {name: '<div style=\"position: absolute;\"><img class="img_ht" src=\"/static/OmniDB_app/images/rename.png\"></div><div style=\"padding-left: 30px;\">View Content</div>'}
+							"copy": {name: '<div style=\"position: absolute;\"><i class=\"fas fa-copy cm-all\" style=\"vertical-align: middle;\"></i></div><div style=\"padding-left: 30px;\">Copy</div>'},
+							"view_data": {name: '<div style=\"position: absolute;\"><i class=\"fas fa-edit cm-all\" style=\"vertical-align: middle;\"></i></div><div style=\"padding-left: 30px;\">View Content</div>'}
 						}
 				    },
 			        cells: function (row, col, prop) {
@@ -1172,6 +1341,7 @@ function removeLoadingCursor() {
 	document.body.classList.remove("cursor_loading");
 }
 
+
 function adjustQueryTabObjects(p_all_tabs) {
 	var v_dbms = v_connTabControl.selectedTab.tag.selectedDBMS;
 
@@ -1186,10 +1356,42 @@ function adjustQueryTabObjects(p_all_tabs) {
 	});
 
 	var v_objects = $(v_target_div).find("." + v_dbms + "_object").each(function() {
-	  $( this ).css('display','inline-block');
+		if (!$( this ).hasClass('dbms_object_hidden'))
+	  	$( this ).css('display','inline-block');
 	});
 
+}
 
+function getOpenedConnTabs(p_node) {
+	var v_option_list = [];
+
+
+	for (var i=0; i < v_connTabControl.tabList.length; i++) (function(i){
+		var v_tab = v_connTabControl.tabList[i];
+		if (v_tab.tag!=null) {
+			if (v_tab.tag.mode=='connection') {
+
+				var v_text = '';
+
+				if (v_tab.tag.selectedTitle!='')
+					v_text = v_tab.tag.selectedTitle + ' - ' + v_tab.tag.selectedDatabase;
+				else
+					v_text = v_tab.tag.selectedDatabase;
+
+				v_option_list.push({
+					text: v_text,
+					icon: 'fas cm-all node-' + v_tab.tag.selectedDBMS,
+					action: function() {
+							executeSnippet(p_node,v_tab);
+					}
+				});
+
+			}
+		}
+	})(i);
+
+
+	return v_option_list;
 }
 
 function showMenuNewTabOuter(e) {
@@ -1201,10 +1403,139 @@ function showMenuNewTabOuter(e) {
 			v_option_list = v_option_list.concat(v_connTabControl.tag.hooks.outerTabMenu[i]());
 	}
 
+	if (v_show_terminal_option)
+		v_option_list.push({
+			text: 'Local Terminal',
+			icon: 'fas cm-all fa-terminal',
+			action: function() {
+				v_connTabControl.tag.createOuterTerminalTab();
+			}
+		});
+
+		//building connection list
+		if (v_connTabControl.tag.connections.length>0) {
+
+			// No custom groups, render all connections in the same list
+			if (v_connTabControl.tag.groups.length==1) {
+				var v_submenu_connection_list = []
+
+				for (var i=0; i<v_connTabControl.tag.connections.length; i++) (function(i){
+					var v_conn = v_connTabControl.tag.connections[i];
+					v_submenu_connection_list.push({
+						text: v_conn.v_details1 + ' - ' + v_conn.v_details2,
+						icon: 'fas cm-all node-' + v_conn.v_db_type,
+						action: function() {
+								v_connTabControl.tag.createConnTab(v_conn.v_conn_id);
+						}
+					});
+				})(i);
+
+				v_option_list.push({
+					text: 'Connections',
+					icon: 'fas cm-all fa-plug',
+					submenu: {
+							elements: v_submenu_connection_list
+					}
+				});
+			}
+			//Render connections split in groups
+			else {
+
+				var v_group_list = [];
+
+				for (var i=0; i<v_connTabControl.tag.groups.length; i++) (function(i){
+					var v_current_group = v_connTabControl.tag.groups[i];
+
+					var v_group_connections = [];
+
+					//First group, add all connections
+					if (i==0) {
+						for (var k=0; k<v_connTabControl.tag.connections.length; k++) (function(k){
+							var v_conn = v_connTabControl.tag.connections[k];
+							v_group_connections.push({
+								text: v_conn.v_details1 + ' - ' + v_conn.v_details2,
+								icon: 'fas cm-all node-' + v_conn.v_db_type,
+								action: function() {
+										v_connTabControl.tag.createConnTab(v_conn.v_conn_id);
+								}
+							});
+						})(k);
+
+					}
+					else {
+						for (var j=0; j<v_current_group.conn_list.length; j++) {
+
+							//Search corresponding connection to use its data
+							for (var k=0; k<v_connTabControl.tag.connections.length; k++) (function(k){
+								var v_conn = v_connTabControl.tag.connections[k];
+								if (v_conn.v_conn_id==v_current_group.conn_list[j]) {
+									v_group_connections.push({
+										text: v_conn.v_details1 + ' - ' + v_conn.v_details2,
+										icon: 'fas cm-all node-' + v_conn.v_db_type,
+										action: function() {
+												v_connTabControl.tag.createConnTab(v_conn.v_conn_id);
+										}
+									});
+									return;
+								}
+							})(k);
+
+						}
+					}
+
+					var v_group_data = {
+						text: v_current_group.v_name,
+						icon: 'fas cm-all fa-plug',
+						submenu: {
+								elements: v_group_connections
+						}
+					}
+
+					v_group_list.push(v_group_data);
+
+				})(i);
+
+				v_option_list.push({
+					text: 'Connections',
+					icon: 'fas cm-all fa-plug',
+					submenu: {
+							elements: v_group_list
+					}
+				});
+
+			}
+	}
+
+	if (v_connTabControl.tag.remote_terminals.length>0) {
+
+		var v_submenu_terminal_list = []
+
+		for (var i=0; i<v_connTabControl.tag.remote_terminals.length; i++) (function(i){
+			var v_term = v_connTabControl.tag.remote_terminals[i];
+			v_submenu_terminal_list.push({
+				text: v_term.v_alias,
+				icon: 'fas cm-all fa-terminal',
+				action: function() {
+						v_connTabControl.tag.createOuterTerminalTab(v_term.v_conn_id,v_term.v_alias);
+				}
+			});
+		})(i);
+
+		v_option_list.push({
+			text: 'SSH Consoles',
+			icon: 'fas cm-all fa-terminal',
+			submenu: {
+					elements: v_submenu_terminal_list
+			}
+		});
+}
+
+
+
 	if (v_option_list.length>0) {
 		v_option_list.unshift({
 			text: 'New Connection',
-			icon: '/static/OmniDB_app/images/test.png',
+			icon: 'fas cm-all fa-plug',
 			action: function() {
 				startLoading();
 				setTimeout(function() { v_connTabControl.tag.createConnTab(); },0);
@@ -1230,25 +1561,62 @@ function showMenuNewTab(e) {
 	var v_option_list = [
 		{
 			text: 'Query Tab',
-			icon: '/static/OmniDB_app/images/text_edit.png',
+			icon: 'fas cm-all fa-search',
 			action: function() {
 				v_connTabControl.tag.createQueryTab();
 			}
 		},
 		{
 			text: 'Console Tab',
-			icon: '/static/OmniDB_app/images/console.png',
+			icon: 'fas cm-all fa-terminal',
 			action: function() {
 				v_connTabControl.tag.createConsoleTab();
 			}
 		}
 	]
 
-	if (v_connTabControl.selectedTab.tag.selectedDBMS=='postgresql') {
+	if (v_connTabControl.selectedTab.tag.selectedDBMS == 'postgresql') {
+		var v_openTabAdvancedObjectSearch = function() {
+			execAjax('/get_postgresql_version/',
+				JSON.stringify({
+					'p_database_index': v_connTabControl.selectedTab.tag.selectedDatabaseIndex,
+					'p_tab_id': v_connTabControl.selectedTab.id
+				}),
+				function(p_return) {
+					tabAdvancedObjectSearch(parseInt(getMajorVersionPostgresql(p_return.v_data.v_version)));
+				},
+				function(p_return) {
+					if (p_return.v_data.password_timeout) {
+						showPasswordPrompt(
+							v_connTabControl.selectedTab.tag.selectedDatabaseIndex,
+							function() {
+								v_openTabAdvancedObjectSearch();
+							},
+							null,
+							p_return.v_data.message
+						);
+					}
+				},
+				'box'
+			);
+		};
+
+		v_option_list.push(
+			{
+				text: 'Advanced Object Search',
+				icon: 'fas cm-all fa-binoculars',
+				action: v_openTabAdvancedObjectSearch
+			}
+		);
+	}
+
+	if (v_connTabControl.selectedTab.tag.selectedDBMS=='postgresql' ||
+			v_connTabControl.selectedTab.tag.selectedDBMS=='mysql' ||
+			v_connTabControl.selectedTab.tag.selectedDBMS=='mariadb') {
 		v_option_list.push(
 			{
 				text: 'Monitoring Dashboard',
-				icon: '/static/OmniDB_app/images/monitoring.png',
+				icon: 'fas cm-all fa-chart-line',
 				action: function() {
 					v_connTabControl.tag.createMonitorDashboardTab();
 					startMonitorDashboard();
@@ -1259,12 +1627,12 @@ function showMenuNewTab(e) {
 		v_option_list.push(
 			{
 				text: 'Backends',
-				icon: '/static/OmniDB_app/images/monitoring.png',
+				icon: 'fas cm-all fa-tasks',
 				action: function() {
 					v_connTabControl.tag.createMonitoringTab(
 							'Backends',
 							'select * from pg_stat_activity', [{
-									icon: '/static/OmniDB_app/images/tab_close.png',
+									icon: 'fas fa-times action-grid action-close',
 									title: 'Terminate',
 									action: 'postgresqlTerminateBackend'
 							}]);
@@ -1276,12 +1644,12 @@ function showMenuNewTab(e) {
 		v_option_list.push(
 			{
 				text: 'Process List',
-				icon: '/static/OmniDB_app/images/monitoring.png',
+				icon: 'fas cm-all fa-tasks',
 				action: function() {
 					v_connTabControl.tag.createMonitoringTab(
 							'Process List',
 							'select * from information_schema.processlist', [{
-									icon: '/static/OmniDB_app/images/tab_close.png',
+									icon: 'fas fa-times action-grid action-close',
 									title: 'Terminate',
 									action: 'mysqlTerminateBackend'
 							}]);

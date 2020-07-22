@@ -1,13 +1,26 @@
 /*
-Copyright 2015-2017 The OmniDB Team
+The MIT License (MIT)
 
-This file is part of OmniDB.
+Portions Copyright (c) 2015-2019, The OmniDB Team
+Portions Copyright (c) 2017-2019, 2ndQuadrant Limited
 
-OmniDB is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-OmniDB is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-You should have received a copy of the GNU General Public License along with OmniDB. If not, see http://www.gnu.org/licenses/.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 */
 
 /// <summary>
@@ -22,22 +35,22 @@ var v_debugState = {
 	Cancel: 5
 }
 
-function setupDebug(p_node) {
+function setupDebug(p_node, p_type) {
 	getDebugFunctionDefinitionPostgresql(p_node);
 
   var v_tab_tag = v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag;
 	v_tab_tag.database_index = v_connTabControl.selectedTab.tag.selectedDatabaseIndex;
 	v_tab_tag.function = p_node.parent.parent.text + '.' + p_node.text;
+	v_tab_tag.type = p_type;
 
 	v_tab_tag.bt_reload.onclick = function() {
 		if (v_tab_tag.state!=v_debugState.Initial && v_tab_tag.state!=v_debugState.Finished && v_tab_tag.state!=v_debugState.Cancel)
 			showAlert('Not ready reload function attributes.');
 		else {
-			setupDebug(p_node);
+			setupDebug(p_node,v_tab_tag.type);
 		}
 	};
 	v_tab_tag.selectParameterTabFunc();
-
 
 	//Customize editor to enable adding breakpoints
 	//Creating breakpoint options
@@ -121,6 +134,7 @@ function setupDebug(p_node) {
 
 			  v_tab_tag.htParameter = new Handsontable(v_tab_tag.div_parameter,
 			  {
+				licenseKey: 'non-commercial-and-evaluation',
 			    data: v_data,
 			    columns : columnProperties,
 			    colHeaders : true,
@@ -174,6 +188,7 @@ function setupDebug(p_node) {
 
   v_tab_tag.htVariable = new Handsontable(v_tab_tag.div_variable,
   {
+	licenseKey: 'non-commercial-and-evaluation',
     data: [],
     columns : columnProperties,
     colHeaders : true,
@@ -230,7 +245,8 @@ function startDebug() {
 	    v_state: v_tab_tag.state,
 			v_conn_tab_id: v_connTabControl.selectedTab.id,
 	    v_tab_id: v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.tab_id,
-	    v_function: v_function
+	    v_function: v_function,
+			v_type: v_tab_tag.type
 	  }
 
 	  var v_context = {
@@ -330,7 +346,8 @@ function stepDebug(p_mode) {
       v_db_index: v_tab_tag.database_index,
       v_state: v_tab_tag.state,
       v_tab_id: v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.tab_id,
-			v_next_breakpoint: v_next_breakpoint
+			v_next_breakpoint: v_next_breakpoint,
+			v_type: v_tab_tag.type
     }
 
     var v_context = {
@@ -398,7 +415,8 @@ function cancelDebug() {
 		var v_message_data = {
 			v_db_index: v_tab_tag.database_index,
 			v_state: v_debugState.Cancel,
-			v_tab_id: v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.tab_id
+			v_tab_id: v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.tab_id,
+			v_type: v_tab_tag.type
 		}
 
 		var v_context = {
@@ -516,6 +534,7 @@ function debugResponseRender(p_message, p_context) {
 
 					p_context.tab_tag.htResult = new Handsontable(p_context.tab_tag.div_result,
 					{
+						licenseKey: 'non-commercial-and-evaluation',
 						data: p_message.v_data.v_result_rows,
 						columns : columnProperties,
 						colHeaders : true,

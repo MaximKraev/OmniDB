@@ -1,13 +1,26 @@
 /*
-Copyright 2015-2017 The OmniDB Team
+The MIT License (MIT)
 
-This file is part of OmniDB.
+Portions Copyright (c) 2015-2019, The OmniDB Team
+Portions Copyright (c) 2017-2019, 2ndQuadrant Limited
 
-OmniDB is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-OmniDB is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-You should have received a copy of the GNU General Public License along with OmniDB. If not, see http://www.gnu.org/licenses/.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 */
 
 /// <summary>
@@ -20,7 +33,7 @@ function getTreeSnippets(p_div) {
       elements : [
         {
           text : 'Refresh',
-          icon: '/static/OmniDB_app/images/refresh.png',
+          icon: 'fas cm-all fa-sync-alt',
           action : function(node) {
             if (node.childNodes==0)
               refreshTreeSnippets(node);
@@ -32,14 +45,14 @@ function getTreeSnippets(p_div) {
         },
         {
           text : 'New Folder',
-          icon: '/static/OmniDB_app/images/folder.png',
+          icon: 'fas cm-all fa-folder',
           action : function(node) {
             newNodeSnippet(node,'node');
           }
         },
         {
           text : 'New Snippet',
-          icon: '/static/OmniDB_app/images/snippet_medium.png',
+          icon: 'fas cm-all fa-align-left',
           action : function(node) {
             newNodeSnippet(node,'snippet');
           }
@@ -50,7 +63,7 @@ function getTreeSnippets(p_div) {
       elements : [
         {
           text : 'Refresh',
-          icon: '/static/OmniDB_app/images/refresh.png',
+          icon: 'fas cm-all fa-sync-alt',
           action : function(node) {
             if (node.childNodes==0)
               refreshTreeSnippets(node);
@@ -62,28 +75,28 @@ function getTreeSnippets(p_div) {
         },
         {
           text : 'New Folder',
-          icon: '/static/OmniDB_app/images/folder.png',
+          icon: 'fas cm-all fa-folder',
           action : function(node) {
             newNodeSnippet(node,'node');
           }
         },
         {
           text : 'New Snippet',
-          icon: '/static/OmniDB_app/images/snippet_medium.png',
+          icon: 'fas cm-all fa-align-left',
           action : function(node) {
             newNodeSnippet(node,'snippet');
           }
         },
         {
           text : 'Rename Folder',
-          icon: '/static/OmniDB_app/images/rename.png',
+          icon: 'fas cm-all fa-edit',
           action : function(node) {
             renameNodeSnippet(node);
           }
         },
         {
           text : 'Delete Folder',
-          icon: '/static/OmniDB_app/images/tab_close.png',
+          icon: 'fas cm-all fa-times',
           action : function(node) {
             deleteNodeSnippet(node);
           }
@@ -94,23 +107,30 @@ function getTreeSnippets(p_div) {
       elements : [
         {
           text : 'Edit',
-          icon: '/static/OmniDB_app/images/text_edit.png',
+          icon: 'fas cm-all fa-edit',
           action : function(node) {
             startEditSnippetText(node);
           }
         },
         {
           text : 'Rename',
-          icon: '/static/OmniDB_app/images/rename.png',
+          icon: 'fas cm-all fa-edit',
           action : function(node) {
             renameNodeSnippet(node);
           }
         },
         {
           text : 'Delete',
-          icon: '/static/OmniDB_app/images/tab_close.png',
+          icon: 'fas cm-all fa-times',
           action : function(node) {
             deleteNodeSnippet(node);
+          }
+        },
+        {
+          text : 'Run Snippet',
+          icon: 'fas cm-all fa-play',
+          submenu : {
+            elements: function(node) { return getOpenedConnTabs(node) }
           }
         }
       ]
@@ -126,8 +146,8 @@ function getTreeSnippets(p_div) {
     refreshTreeSnippets(node);
   }
 
-  var node1 = tree.createNode('Snippets',false,'/static/OmniDB_app/images/circle_blue.png',null,{ type: 'node', id:null},'cm_node_root');
-  node1.createChildNode('',true,'/static/OmniDB_app/images/spin.svg',null,null);
+  var node1 = tree.createNode('Snippets',false,'fas node-all fa-list-alt node-snippet-list',null,{ type: 'node', id:null},'cm_node_root');
+  node1.createChildNode('',true,'node-spin',null,null);
 
   tree.drawTree();
   v_connTabControl.selectedTab.tag.tree = tree;
@@ -152,7 +172,7 @@ function refreshTreeSnippets(node) {
 function getChildSnippetNodes(node) {
 
 	node.removeChildNodes();
-	node.createChildNode('',false,'/static/OmniDB_app/images/spin.svg',null,null);
+	node.createChildNode('',false,'node-spin',null,null);
 
 
 	execAjax('/get_node_children/',
@@ -163,12 +183,12 @@ function getChildSnippetNodes(node) {
 					node.removeChildNodes();
 
 				for (i=0; i<p_return.v_data.v_list_nodes.length; i++) {
-          var v_node = node.createChildNode(p_return.v_data.v_list_nodes[i].v_name,false,'/static/OmniDB_app/images/folder.png',{ type: 'node', id: p_return.v_data.v_list_nodes[i].v_id, id_parent: node.tag.id, name: p_return.v_data.v_list_nodes[i].v_name},'cm_node');
-          v_node.createChildNode('',true,'/static/OmniDB_app/images/spin.svg',null,null);
+          var v_node = node.createChildNode(p_return.v_data.v_list_nodes[i].v_name,false,'fas node-all fa-folder node-snippet-folder',{ type: 'node', id: p_return.v_data.v_list_nodes[i].v_id, id_parent: node.tag.id, name: p_return.v_data.v_list_nodes[i].v_name},'cm_node');
+          v_node.createChildNode('',true,'node-spin',null,null);
         }
 
         for (i=0; i<p_return.v_data.v_list_texts.length; i++) {
-          var v_node = node.createChildNode(p_return.v_data.v_list_texts[i].v_name,false,'/static/OmniDB_app/images/snippet_medium.png',{ type: 'snippet', id: p_return.v_data.v_list_texts[i].v_id, id_parent: node.tag.id, name: p_return.v_data.v_list_texts[i].v_name},'cm_snippet');
+          var v_node = node.createChildNode(p_return.v_data.v_list_texts[i].v_name,false,'fas node-all fa-align-left node-snippet-snippet',{ type: 'snippet', id: p_return.v_data.v_list_texts[i].v_id, id_parent: node.tag.id, name: p_return.v_data.v_list_texts[i].v_name},'cm_snippet');
           v_node.doubleClickNodeEvent = function(p_node) {
             startEditSnippetText(p_node);
           }
@@ -214,6 +234,15 @@ function saveSnippetText() {
                   }
                   saveSnippetTextConfirm(v_save_object)
   	            });
+
+    var v_input = document.getElementById('element_name');
+  	v_input.onkeydown = function() {
+  		if (event.keyCode == 13)
+  			document.getElementById('button_confirm_ok').click();
+  		else if (event.keyCode == 27)
+  			document.getElementById('button_confirm_cancel').click();
+  	}
+    v_input.focus();
   }
 }
 
@@ -258,6 +287,14 @@ function newNodeSnippet(p_node,p_mode) {
                    			'box');
 
 	            });
+
+  var v_input = document.getElementById('element_name');
+	v_input.onkeydown = function() {
+		if (event.keyCode == 13)
+			document.getElementById('button_confirm_ok').click();
+		else if (event.keyCode == 27)
+			document.getElementById('button_confirm_cancel').click();
+	}
 }
 
 function renameNodeSnippet(p_node) {
@@ -275,6 +312,14 @@ function renameNodeSnippet(p_node) {
                    			'box');
 
 	            });
+
+  var v_input = document.getElementById('element_name');
+	v_input.onkeydown = function() {
+		if (event.keyCode == 13)
+			document.getElementById('button_confirm_ok').click();
+		else if (event.keyCode == 27)
+			document.getElementById('button_confirm_cancel').click();
+	}
 }
 
 function deleteNodeSnippet(p_node) {
@@ -303,6 +348,20 @@ function startEditSnippetText(p_node) {
         v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.editor.clearSelection();
         v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.editor.gotoLine(0, 0, true);
 
+			},
+			null,
+			'box');
+}
+
+function executeSnippet(p_node,p_tab) {
+	execAjax('/get_snippet_text/',
+			JSON.stringify({"p_st_id": p_node.tag.id}),
+			function(p_return) {
+				v_connTabControl.selectTab(p_tab);
+				v_connTabControl.tag.createQueryTab();
+				v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.editor.setValue(p_return.v_data);
+				v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.editor.clearSelection();
+				v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.editor.gotoLine(0, 0, true);
 			},
 			null,
 			'box');

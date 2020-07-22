@@ -21,7 +21,8 @@ logger = logging.getLogger(__name__)
 
 def index(request):
     context = {
-        'omnidb_short_version': settings.OMNIDB_SHORT_VERSION
+        'omnidb_short_version': settings.OMNIDB_SHORT_VERSION,
+        'url_folder': settings.PATH
     }
 
     user = request.GET.get('user', '')
@@ -29,7 +30,6 @@ def index(request):
 
     if user and pwd:
         num_connections = sign_in_automatic(request,user,pwd)
-
 
         if num_connections >= 0:
             return redirect('workspace')
@@ -97,7 +97,9 @@ def sign_in_automatic(request, username, pwd):
                u.editor_font_size,
                (case when u.chat_enabled is null then 1 else u.chat_enabled end) as chat_enabled,
                (case when u.super_user is null then 0 else u.super_user end) as super_user,
-               u.user_key
+               u.csv_encoding,
+               u.csv_delimiter,
+               u.interface_font_size
         from users u,
              themes t
          where u.theme_id = t.theme_id
@@ -107,8 +109,7 @@ def sign_in_automatic(request, username, pwd):
     if len(table.Rows) > 0:
         cryptor = Utils.Cryptor('omnidb', 'iso-8859-1')
 
-        pwd_decrypted = cryptor.Decrypt(table.Rows[0]['password'])
-        if pwd_decrypted == pwd:
+        if cryptor.Hash(cryptor.Encrypt(pwd)) == table.Rows[0]['password']:
 
             #creating session key to use it
             try:
@@ -126,10 +127,13 @@ def sign_in_automatic(request, username, pwd):
                 table.Rows[0]["theme_type"],
                 table.Rows[0]["theme_id"],
                 table.Rows[0]["editor_font_size"],
+                table.Rows[0]["interface_font_size"],
                 int(table.Rows[0]["chat_enabled"]),
                 int(table.Rows[0]["super_user"]),
                 cryptor,
-                request.session.session_key
+                request.session.session_key,
+                table.Rows[0]["csv_encoding"],
+                table.Rows[0]["csv_delimiter"]
             )
 
             #v_session.RefreshDatabaseList()
@@ -137,8 +141,6 @@ def sign_in_automatic(request, username, pwd):
 
             if not request.session.get('cryptor'):
                 request.session['cryptor'] = cryptor
-
-
 
             return len(v_session.v_databases)
 
@@ -182,7 +184,9 @@ def sign_in(request):
                u.editor_font_size,
                (case when u.chat_enabled is null then 1 else u.chat_enabled end) as chat_enabled,
                (case when u.super_user is null then 0 else u.super_user end) as super_user,
-               u.user_key
+               u.csv_encoding,
+               u.csv_delimiter,
+               u.interface_font_size
         from users u,
              themes t
          where u.theme_id = t.theme_id
@@ -192,8 +196,7 @@ def sign_in(request):
     if len(table.Rows) > 0:
         cryptor = Utils.Cryptor('omnidb', 'iso-8859-1')
 
-        pwd_decrypted = cryptor.Decrypt(table.Rows[0]['password'])
-        if pwd_decrypted == pwd:
+        if cryptor.Hash(cryptor.Encrypt(pwd)) == table.Rows[0]['password']:
 
             #creating session key to use it
             request.session.save()
@@ -208,10 +211,13 @@ def sign_in(request):
                 table.Rows[0]["theme_type"],
                 table.Rows[0]["theme_id"],
                 table.Rows[0]["editor_font_size"],
+                table.Rows[0]["interface_font_size"],
                 int(table.Rows[0]["chat_enabled"]),
                 int(table.Rows[0]["super_user"]),
                 cryptor,
-                request.session.session_key
+                request.session.session_key,
+                table.Rows[0]["csv_encoding"],
+                table.Rows[0]["csv_delimiter"]
             )
 
             #v_session.RefreshDatabaseList()
