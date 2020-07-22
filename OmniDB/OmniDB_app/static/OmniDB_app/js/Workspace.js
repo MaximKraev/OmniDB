@@ -46,7 +46,7 @@ $(function () {
 
 
 	v_connTabControl.tag.createSnippetTab();
-	if (v_welcome_closed==0) {
+	if (false) {
 		v_connTabControl.tag.createWebsiteOuterTab(v_short_version,null,
 		`
 		<div class="welcome_release_content">
