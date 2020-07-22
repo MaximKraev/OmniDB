@@ -661,7 +661,7 @@ def start_wsserver():
           (r'' + settings.PATH + '/wss',WSHandler),
           (r'' + settings.PATH + '/chatws', ws_chat.WSHandler),
           (r'' + settings.PATH + '/chatwss',ws_chat.WSHandler)
-        ], websocket_ping_timeout=10)
+        ], websocket_ping_interval=10)
 
         if settings.IS_SSL:
             ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
