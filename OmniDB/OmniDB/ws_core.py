@@ -1,4 +1,4 @@
-import threading, time, datetime, json
+import threading, time, datetime, json, uuid
 from concurrent.futures.thread import ThreadPoolExecutor
 import traceback
 
@@ -20,6 +20,7 @@ from datetime import datetime
 import sys
 
 from . import settings
+from . import custom_settings
 
 from django.contrib.sessions.backends.db import SessionStore
 
@@ -36,6 +37,11 @@ from OmniDB.startup import clean_temp_folder
 
 import sqlparse
 
+import pexpect
+sys.path.append('OmniDB_app/include')
+from OmniDB_app.include import paramiko
+from OmniDB_app.include import custom_paramiko_expect
+
 class StoppableThread(threading.Thread):
     def __init__(self,p1,p2,p3):
         super(StoppableThread, self).__init__(target=p1, args=(self,p2,p3,))
@@ -44,7 +50,7 @@ class StoppableThread(threading.Thread):
         self.cancel = True
 
 class StoppableThreadPool(ThreadPoolExecutor):
-    def __init__(self, p_max_workers=settings.THREAD_POOL_MAX_WORKERS, p_tag={}):
+    def __init__(self, p_max_workers=custom_settings.THREAD_POOL_MAX_WORKERS, p_tag={}):
         super(StoppableThreadPool, self).__init__(max_workers=p_max_workers)
         self.tag = p_tag
         self.cancel = False
@@ -71,8 +77,10 @@ class request(IntEnum):
   CancelThread   = 6
   Debug          = 7
   CloseTab       = 8
-  DataMining     = 9
+  AdvancedObjectSearch     = 9
   Console        = 10
+  Terminal       = 11
+  Ping           = 12
 
 class response(IntEnum):
   LoginResult         = 0
@@ -85,8 +93,10 @@ class response(IntEnum):
   MessageException    = 7
   DebugResponse       = 8
   RemoveContext       = 9
-  DataMiningResult    = 10
+  AdvancedObjectSearchResult    = 10
   ConsoleResult       = 11
+  TerminalResult      = 12
+  Pong                = 13
 
 class debugState(IntEnum):
   Initial  = 0
@@ -96,9 +106,12 @@ class debugState(IntEnum):
   Finished = 4
   Cancel   = 5
 
+connection_list = dict([])
+
 def closeTabHandler(ws_object,p_tab_object_id):
     try:
         tab_object = ws_object.v_list_tab_objects[p_tab_object_id]
+        del ws_object.v_list_tab_objects[p_tab_object_id]
         if tab_object['type'] == 'query':
             try:
                 tab_object['omnidatabase'].v_connection.Cancel(False)
@@ -106,7 +119,7 @@ def closeTabHandler(ws_object,p_tab_object_id):
                 None
             try:
                 tab_object['omnidatabase'].v_connection.Close()
-            except Exception:
+            except Exception as exc:
                 None
         elif tab_object['type'] == 'debug':
             tab_object['cancelled'] = True
@@ -126,7 +139,18 @@ def closeTabHandler(ws_object,p_tab_object_id):
                 tab_object['omnidatabase_debug'].v_connection.Close()
             except Exception:
                 None
-        del ws_object.v_list_tab_objects[p_tab_object_id]
+        elif tab_object['type'] == 'terminal':
+            if tab_object['thread']!=None:
+                tab_object['thread'].stop()
+            if tab_object['terminal_type'] == 'local':
+                tab_object['terminal_object'].terminate()
+            else:
+                tab_object['terminal_object'].close()
+                tab_object['terminal_ssh_client'].close()
+
+
+
+
     except Exception as exc:
         None
 
@@ -155,17 +179,22 @@ def thread_dispatcher(self,args,ws_object):
                 ws_object.v_session = v_session
                 v_response['v_code'] = response.LoginResult
                 ws_object.v_list_tab_objects = dict([])
-                ws_object.write_message(json.dumps(v_response))
+                ws_object.terminal_command_list = []
+                ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
             except Exception:
                 v_response['v_code'] = response.SessionMissing
-                ws_object.write_message(json.dumps(v_response))
+                ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+        elif v_code == request.Ping:
+            ws_object.last_ping_time = datetime.now()
+            v_response['v_code'] = response.Pong
+            ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
         else:
             #Cancel thread
             if v_code == request.CancelThread:
                 try:
                     thread_data = ws_object.v_list_tab_objects[v_data]
                     if thread_data:
-                        if thread_data['type'] == 'datamining':
+                        if thread_data['type'] == 'advancedobjectsearch':
                             def callback(self):
                                 try:
                                     self.tag['lock'].acquire()
@@ -201,7 +230,7 @@ def thread_dispatcher(self,args,ws_object):
                     #Send Ack Message
                     v_response['v_code'] = response.QueryAck
                     #ws_object.write_message(json.dumps(v_response))
-                    tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+                    ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
                     #Getting refreshed session
                     s = SessionStore(session_key=ws_object.v_user_key)
@@ -209,14 +238,84 @@ def thread_dispatcher(self,args,ws_object):
                     ws_object.v_session = v_session
 
                     #Check database prompt timeout
-                    v_timeout = v_session.DatabaseReachPasswordTimeout(v_data['v_db_index'])
-                    if v_timeout['timeout']:
-                        v_response['v_code'] = response.PasswordRequired
-                        v_response['v_data'] = v_timeout['message']
-                        ws_object.write_message(json.dumps(v_response))
-                        return
+                    if v_data['v_db_index']!=None:
+                        v_timeout = v_session.DatabaseReachPasswordTimeout(v_data['v_db_index'])
+                        if v_timeout['timeout']:
+                            v_response['v_code'] = response.PasswordRequired
+                            v_response['v_data'] = v_timeout['message']
+                            ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+                            return
 
-                    if v_code == request.Query or v_code == request.QueryEditData or v_code == request.SaveEditData or v_code == request.DataMining or v_code == request.Console:
+                    if v_code == request.Terminal:
+                        #create tab object if it doesn't exist
+                        try:
+                            tab_object = ws_object.v_list_tab_objects[v_data['v_tab_id']]
+                        except Exception as exc:
+                            tab_object =  {
+                                            'thread': None,
+                                            'terminal_object': None
+                                          }
+                            ws_object.v_list_tab_objects[v_data['v_tab_id']] = tab_object
+
+                            start_thread = True
+
+                            try:
+                                #spawn local terminal
+                                if v_data['v_ssh_id'] == -1:
+                                    start_thread = False
+                                    v_response['v_code'] = response.MessageException
+                                    v_response['v_data'] = 'Feature under development.'
+                                    ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+                                    #if not v_session.v_super_user:
+                                    #    start_thread = False
+                                    #    v_response['v_code'] = response.MessageException
+                                    #    v_response['v_data'] = 'Must be superuser to start a local terminal.'
+                                    #    ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+                                    #else:
+                                    #    tab_object['terminal_object'] = pexpect.spawn('/bin/bash',encoding='utf-8')
+                                    #    tab_object['terminal_object'].send(v_data['v_cmd'])
+                                    #    tab_object['terminal_type'] = 'local'
+                                #spawn remote terminal
+                                else:
+                                    v_conn_object = v_session.v_databases[v_data['v_ssh_id']]
+
+                                    client = paramiko.SSHClient()
+                                    client.load_system_host_keys()
+                                    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+                                    #ssh key provided
+                                    if v_conn_object['tunnel']['key'].strip() != '':
+                                        v_file_name = '{0}'.format(str(time.time())).replace('.','_')
+                                        v_full_file_name = os.path.join(settings.TEMP_DIR, v_file_name)
+                                        with open(v_full_file_name,'w') as f:
+                                            f.write(v_conn_object['tunnel']['key'])
+                                        client.connect(hostname=v_conn_object['tunnel']['server'],username=v_conn_object['tunnel']['user'],key_filename=v_full_file_name,passphrase=v_conn_object['tunnel']['password'],port=int(v_conn_object['tunnel']['port']))
+                                    else:
+                                        client.connect(hostname=v_conn_object['tunnel']['server'],username=v_conn_object['tunnel']['user'],password=v_conn_object['tunnel']['password'],port=int(v_conn_object['tunnel']['port']))
+                                    tab_object['terminal_ssh_client'] = client
+                                    tab_object['terminal_object'] = custom_paramiko_expect.SSHClientInteraction(client,timeout=60, display=False)
+                                    tab_object['terminal_object'].send(v_data['v_cmd'])
+
+                                    tab_object['terminal_type'] = 'remote'
+
+                            except Exception as exc:
+                                start_thread = False
+                                logger.error('''*** Exception ***\n{0}'''.format(traceback.format_exc()))
+                                v_response['v_code'] = response.MessageException
+                                v_response['v_data'] = str(exc)
+                                ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+
+                            if start_thread:
+                                v_data['v_context_code'] = v_context_code
+                                v_data['v_tab_object'] = tab_object
+                                t = StoppableThread(thread_terminal,v_data,ws_object)
+                                tab_object['thread'] = t
+                                tab_object['type'] = 'terminal'
+                                tab_object['tab_id'] = v_data['v_tab_id']
+                                t.start()
+
+
+                    if v_code == request.Query or v_code == request.QueryEditData or v_code == request.SaveEditData or v_code == request.AdvancedObjectSearch or v_code == request.Console:
 
                         #create tab object if it doesn't exist
                         try:
@@ -235,19 +334,22 @@ def thread_dispatcher(self,args,ws_object):
                             v_conn_tab_connection.v_db_type!=tab_object['omnidatabase'].v_db_type or
                             v_conn_tab_connection.v_connection.v_host!=tab_object['omnidatabase'].v_connection.v_host or
                             str(v_conn_tab_connection.v_connection.v_port)!=str(tab_object['omnidatabase'].v_connection.v_port) or
-                            v_conn_tab_connection.v_service!=tab_object['omnidatabase'].v_service or
+                            v_conn_tab_connection.v_active_service!=tab_object['omnidatabase'].v_active_service or
                             v_conn_tab_connection.v_user!=tab_object['omnidatabase'].v_user or
                             v_conn_tab_connection.v_connection.v_password!=tab_object['omnidatabase'].v_connection.v_password):
                                 v_database_new = OmniDatabase.Generic.InstantiateDatabase(
                                     v_conn_tab_connection.v_db_type,
                                     v_conn_tab_connection.v_connection.v_host,
                                     str(v_conn_tab_connection.v_connection.v_port),
-                                    v_conn_tab_connection.v_service,
-                                    v_conn_tab_connection.v_user,
+                                    v_conn_tab_connection.v_active_service,
+                                    v_conn_tab_connection.v_active_user,
                                     v_conn_tab_connection.v_connection.v_password,
                                     v_conn_tab_connection.v_conn_id,
-                                    v_conn_tab_connection.v_alias
+                                    v_conn_tab_connection.v_alias,
+                                    p_conn_string = v_conn_tab_connection.v_conn_string,
+                                    p_parse_conn_string = False
                                 )
+
                                 tab_object['omnidatabase'] = v_database_new
                                 tab_object['database_index'] = v_data['v_db_index']
 
@@ -255,9 +357,7 @@ def thread_dispatcher(self,args,ws_object):
                             logger.error('''*** Exception ***\n{0}'''.format(traceback.format_exc()))
                             v_response['v_code'] = response.MessageException
                             v_response['v_data'] = traceback.format_exc().replace('\n','<br>')
-                            ws_object.write_message(json.dumps(v_response))
-
-
+                            ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
                         v_data['v_context_code'] = v_context_code
                         v_data['v_database'] = tab_object['omnidatabase']
@@ -301,10 +401,10 @@ def thread_dispatcher(self,args,ws_object):
                             tab_object['type'] = 'edit'
                             #t.setDaemon(True)
                             t.start()
-                        #Query Data Mining
-                        elif v_code == request.DataMining:
+                        #Query Advanced Object Search
+                        elif v_code == request.AdvancedObjectSearch:
                             v_response = {
-                                'v_code': response.DataMiningResult,
+                                'v_code': response.AdvancedObjectSearchResult,
                                 'v_context_code': v_data['v_context_code'],
                                 'v_error': False,
                                 'v_data': 1
@@ -312,7 +412,7 @@ def thread_dispatcher(self,args,ws_object):
 
                             tab_object['tab_db_id'] = v_data['v_tab_db_id']
                             v_data['v_tab_object'] = tab_object
-                            v_data['v_sql_dict'] = tab_object['omnidatabase'].DataMining(v_data['text'], v_data['caseSensitive'], v_data['regex'], v_data['categoryList'], v_data['schemaList'], v_data['dataCategoryFilter'])
+                            v_data['v_sql_dict'] = tab_object['omnidatabase'].AdvancedObjectSearch(v_data['text'], v_data['caseSensitive'], v_data['regex'], v_data['categoryList'], v_data['schemaList'], v_data['dataCategoryFilter'])
 
                             t = StoppableThreadPool(
                                 p_tag = {
@@ -323,7 +423,7 @@ def thread_dispatcher(self,args,ws_object):
                             )
 
                             tab_object['thread_pool'] = t
-                            tab_object['type'] = 'datamining'
+                            tab_object['type'] = 'advancedobjectsearch'
                             tab_object['tab_id'] = v_data['v_tab_id']
 
                             v_argsList = []
@@ -342,7 +442,7 @@ def thread_dispatcher(self,args,ws_object):
 
                             try:
                                 #Will block here until thread pool ends
-                                t.start(thread_datamining, v_argsList)
+                                t.start(thread_advancedobjectsearch, v_argsList)
 
                                 log_end_time = datetime.now()
                                 v_duration = GetDuration(log_start_time,log_end_time)
@@ -363,7 +463,7 @@ def thread_dispatcher(self,args,ws_object):
 
                             #If the thread pool wasn't previously cancelled
                             if not t.cancel:
-                                tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+                                ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
                     #Debugger
                     elif v_code == request.Debug:
@@ -376,21 +476,25 @@ def thread_dispatcher(self,args,ws_object):
                                     v_conn_tab_connection.v_db_type,
                                     v_conn_tab_connection.v_connection.v_host,
                                     str(v_conn_tab_connection.v_connection.v_port),
-                                    v_conn_tab_connection.v_service,
-                                    v_conn_tab_connection.v_user,
+                                    v_conn_tab_connection.v_active_service,
+                                    v_conn_tab_connection.v_active_user,
                                     v_conn_tab_connection.v_connection.v_password,
                                     v_conn_tab_connection.v_conn_id,
-                                    v_conn_tab_connection.v_alias
+                                    v_conn_tab_connection.v_alias,
+                                    p_conn_string = v_conn_tab_connection.v_conn_string,
+                                    p_parse_conn_string = False
                                 )
                                 v_database_control = OmniDatabase.Generic.InstantiateDatabase(
                                     v_conn_tab_connection.v_db_type,
                                     v_conn_tab_connection.v_connection.v_host,
                                     str(v_conn_tab_connection.v_connection.v_port),
-                                    v_conn_tab_connection.v_service,
-                                    v_conn_tab_connection.v_user,
+                                    v_conn_tab_connection.v_active_service,
+                                    v_conn_tab_connection.v_active_user,
                                     v_conn_tab_connection.v_connection.v_password,
                                     v_conn_tab_connection.v_conn_id,
-                                    v_conn_tab_connection.v_alias
+                                    v_conn_tab_connection.v_alias,
+                                    p_conn_string = v_conn_tab_connection.v_conn_string,
+                                    p_parse_conn_string = False
                                 )
                                 tab_object =  { 'thread': None,
                                              'omnidatabase_debug': v_database_debug,
@@ -404,7 +508,7 @@ def thread_dispatcher(self,args,ws_object):
                                 logger.error('''*** Exception ***\n{0}'''.format(traceback.format_exc()))
                                 v_response['v_code'] = response.MessageException
                                 v_response['v_data'] = traceback.format_exc().replace('\n','<br>')
-                                ws_object.write_message(json.dumps(v_response))
+                                ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
                         #Existing debugger, get existing tab_object
                         else:
@@ -412,7 +516,10 @@ def thread_dispatcher(self,args,ws_object):
 
                         v_data['v_context_code'] = v_context_code
                         v_data['v_tab_object'] = tab_object
-                        v_data['v_port'] = v_session.v_databases[v_data['v_db_index']]['database'].v_port
+
+                        # Instead of getting the connection port which can be forwarded, we get the local PostgreSQL port
+                        #v_data['v_port'] = v_session.v_databases[v_data['v_db_index']]['database'].v_port
+                        v_data['v_port'] = v_session.v_databases[v_data['v_db_index']]['database'].v_connection.ExecuteScalar('show port')
 
                         t = StoppableThread(thread_debug,v_data,ws_object)
                         #tab_object['thread'] = t
@@ -422,24 +529,112 @@ def thread_dispatcher(self,args,ws_object):
                 except Exception as exc:
                     v_response['v_code'] = response.SessionMissing
                     #ws_object.write_message(json.dumps(v_response))
-                    tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+                    ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
     except Exception as exc:
         logger.error('''*** Exception ***\n{0}'''.format(traceback.format_exc()))
         v_response['v_code'] = response.MessageException
         v_response['v_data'] = traceback.format_exc().replace('\n','<br>')
         #ws_object.write_message(json.dumps(v_response))
-        tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+        ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+
+def thread_dispatcher_terminal_command(self,args,ws_object):
+    message = args
+
+    while True:
+        ws_object.terminal_lock.acquire()
+        if self.cancel:
+            break
+        while True:
+            try:
+                element = ws_object.terminal_command_list.pop(0)
+                tab_object = ws_object.v_list_tab_objects[element['v_tab_id']]
+
+                tab_object['terminal_object'].send(element['v_cmd'])
+            except Exception:
+                break
+
+def thread_client_control(self,args,object):
+    message = args
+
+    while True:
+        time.sleep(300)
+        for k in list(connection_list.keys()):
+            client_object = connection_list[k]
+            try:
+                if ((datetime.now() - client_object.last_ping_time).total_seconds() > 600):
+                    del connection_list[k]
+                    client_object.close()
+            except Exception as exc:
+                logger.error('''*** Exception ***\n{0}'''.format(traceback.format_exc()))
 
 class WSHandler(tornado.websocket.WebSocketHandler):
   def open(self):
+    client_id = str(uuid.uuid4())
+    self.client_id = client_id
+    self.last_ping_time = datetime.now()
+    connection_list[client_id] = self
+    self.event_loop = tornado.ioloop.IOLoop.instance()
+    spawn_thread = False
+
+    lock = threading.Lock()
+    self.terminal_lock = lock
+    self.terminal_lock.acquire()
+    self.terminal_thread = StoppableThread(thread_dispatcher_terminal_command,'',self)
+    self.terminal_thread.start()
     None
   def on_message(self, message):
-    t = StoppableThread(thread_dispatcher,message,self)
-    t.start()
+
+    try:
+        json_object = json.loads(message)
+        v_code = json_object['v_code']
+        v_context_code = json_object['v_context_code']
+        v_data = json_object['v_data']
+        spawn_thread = True
+
+        if v_code == request.Terminal:
+            #create tab object if it doesn't exist
+            try:
+                tab_object = self.v_list_tab_objects[v_data['v_tab_id']]
+
+                #object exists, send new command
+                spawn_thread = False
+                self.terminal_command_list.append({'v_tab_id': v_data['v_tab_id'], 'v_cmd': v_data['v_cmd']})
+                try:
+                    self.terminal_lock.release()
+                except Exception as exc:
+                    None
+
+
+
+            except Exception as exc:
+                None
+        if spawn_thread:
+            t = StoppableThread(thread_dispatcher,message,self)
+            t.start()
+
+    except Exception as exc:
+        logger.error('''*** Exception ***\n{0}'''.format(traceback.format_exc()))
+        v_response['v_code'] = response.MessageException
+        v_response['v_data'] = traceback.format_exc().replace('\n','<br>')
+        #ws_object.write_message(json.dumps(v_response))
+        ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
   def on_close(self):
     try:
+        #closing terminal thread
+        try:
+            self.terminal_thread.stop()
+            self.terminal_lock.release()
+        except Exception as exc:
+            None
+
+        #removing client object from list of clients
+        try:
+            del connection_list[self.client_id]
+        except Exception as exc:
+            None
+
         for k in list(self.v_list_tab_objects.keys()):
             closeTabHandler(self,k)
     except Exception:
@@ -454,25 +649,35 @@ def start_wsserver_thread():
     t.setDaemon(True)
     t.start()
 
+import asyncio
+from tornado.platform.asyncio import AnyThreadEventLoopPolicy
+
 def start_wsserver():
     logger.info('''*** Starting OmniDB ***''')
 
     try:
         application = tornado.web.Application([
-          (r'/ws', WSHandler),
-          (r'/wss',WSHandler),
-          (r'/chatws', ws_chat.WSHandler),
-          (r'/chatwss',ws_chat.WSHandler)
+          (r'' + settings.PATH + '/ws', WSHandler),
+          (r'' + settings.PATH + '/wss',WSHandler),
+          (r'' + settings.PATH + '/chatws', ws_chat.WSHandler),
+          (r'' + settings.PATH + '/chatwss',ws_chat.WSHandler)
         ], websocket_ping_timeout=10)
 
         if settings.IS_SSL:
             ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            ssl_ctx.options |= ssl.OP_NO_TLSv1
+            ssl_ctx.options |= ssl.OP_NO_TLSv1_1
             ssl_ctx.load_cert_chain(settings.SSL_CERTIFICATE,
                                    settings.SSL_KEY)
             server = tornado.httpserver.HTTPServer(application, ssl_options=ssl_ctx)
         else:
             server = tornado.httpserver.HTTPServer(application)
 
+        #Start thread that controls clients
+        thread_clients = StoppableThread(thread_client_control,None,None)
+        thread_clients.start()
+
+        asyncio.set_event_loop_policy(AnyThreadEventLoopPolicy())
         server.listen(settings.OMNIDB_WEBSOCKET_PORT,address=settings.OMNIDB_ADDRESS)
         tornado.ioloop.IOLoop.instance().start()
 
@@ -506,7 +711,8 @@ def LogHistory(p_omnidb_database,
                p_start,
                p_end,
                p_duration,
-               p_status):
+               p_status,
+               p_conn_id):
 
     try:
 
@@ -531,17 +737,19 @@ COMMAND: {5}'''.format(p_user_name,
             '{2}',
             '{3}',
             '{4}',
-            '{5}')
+            '{5}',
+            {6})
         '''.format(p_user_id,
                    p_sql.replace("'","''"),
-                   p_start.strftime('%Y-%m-%d %H:%M:%S.%f'),
-                   p_end.strftime('%Y-%m-%d %H:%M:%S.%f'),
+                   p_start.strftime('%Y-%m-%d %H:%M:%S'),
+                   p_end.strftime('%Y-%m-%d %H:%M:%S'),
                    p_status,
-                   p_duration))
+                   p_duration,
+                   p_conn_id))
     except Exception as exc:
         logger.error('''*** Exception ***\n{0}'''.format(traceback.format_exc()))
 
-def thread_datamining(self, p_key1, p_key2, p_sql, p_args, p_ws_object):
+def thread_advancedobjectsearch(self, p_key1, p_key2, p_sql, p_args, p_ws_object):
     try:
         v_session = p_ws_object.v_session
 
@@ -551,13 +759,15 @@ def thread_datamining(self, p_key1, p_key2, p_sql, p_args, p_ws_object):
 
         v_database = OmniDatabase.Generic.InstantiateDatabase(
             p_args['v_database'].v_db_type,
-            p_args['v_database'].v_server,
-            p_args['v_database'].v_port,
-            p_args['v_database'].v_service,
-            p_args['v_database'].v_user,
+            p_args['v_database'].v_connection.v_host,
+            p_args['v_database'].v_connection.v_port,
+            p_args['v_database'].v_active_service,
+            p_args['v_database'].v_active_user,
             p_args['v_database'].v_connection.v_password,
             p_args['v_database'].v_conn_id,
-            p_args['v_database'].v_alias
+            p_args['v_database'].v_alias,
+            p_conn_string = p_args['v_database'].v_conn_string,
+            p_parse_conn_string = False
         )
 
         v_database.v_connection.Open()
@@ -658,6 +868,8 @@ def thread_query(self,args,ws_object):
         v_mode           = args['v_mode']
         v_all_data       = args['v_all_data']
         v_log_query      = args['v_log_query']
+        v_tab_title      = args['v_tab_title']
+        v_autocommit     = args['v_autocommit']
 
         #Removing last character if it is a semi-colon
         if v_sql[-1:]==';':
@@ -686,10 +898,10 @@ def thread_query(self,args,ws_object):
                 try:
                     v_omnidb_database.v_connection.Open()
                     v_omnidb_database.v_connection.Execute('''
-                    insert into tabs (conn_id,user_id,tab_id,snippet)
+                    insert into tabs (conn_id,user_id,tab_id,snippet,title)
                     values
-                    ({0},{1},(select coalesce(max(tab_id), 0) + 1 from tabs),'{2}')
-                    '''.format(ws_object.v_session.v_databases[v_tab_object['database_index']]['database'].v_conn_id, ws_object.v_session.v_user_id, v_tab_object['sql_save'].replace("'","''")))
+                    ({0},{1},(select coalesce(max(tab_id), 0) + 1 from tabs),'{2}','{3}')
+                    '''.format(ws_object.v_session.v_databases[v_tab_object['database_index']]['database'].v_conn_id, ws_object.v_session.v_user_id, v_tab_object['sql_save'].replace("'","''"),v_tab_title.replace("'","''")))
                     v_inserted_id = v_omnidb_database.v_connection.ExecuteScalar('''
                     select coalesce(max(tab_id), 0) from tabs
                     ''')
@@ -717,123 +929,223 @@ def thread_query(self,args,ws_object):
                     os.makedirs(v_export_dir)
 
                 v_database.v_connection.Open()
-                v_data1 = v_database.v_connection.QueryBlock(v_sql, -1, True, False)
-                v_database.v_connection.Close()
                 v_file_name = '{0}.{1}'.format(str(time.time()).replace('.','_'),v_extension)
-                if platform.system() == 'Windows':
-                    f = Spartacus.Utils.DataFileWriter(os.path.join(v_export_dir, v_file_name), v_data1.Columns, 'windows-1252')
-                else:
-                    f = Spartacus.Utils.DataFileWriter(os.path.join(v_export_dir, v_file_name), v_data1.Columns)
+                v_data1 = v_database.v_connection.QueryBlock(v_sql, 1000, False, True)
+                #if platform.system() == 'Windows':
+                #    f = Spartacus.Utils.DataFileWriter(os.path.join(v_export_dir, v_file_name), v_data1.Columns, 'windows-1252')
+                #else:
+                #    f = Spartacus.Utils.DataFileWriter(os.path.join(v_export_dir, v_file_name), v_data1.Columns)
+                f = Spartacus.Utils.DataFileWriter(os.path.join(v_export_dir, v_file_name), v_data1.Columns,v_session.v_csv_encoding, v_session.v_csv_delimiter)
                 f.Open()
-                f.Write(v_data1)
+                if v_database.v_connection.v_start:
+                    f.Write(v_data1)
+                    v_hasmorerecords = False
+                elif len(v_data1.Rows) > 0:
+                    f.Write(v_data1)
+                    v_hasmorerecords = True
+                else:
+                    v_hasmorerecords = False
+                while v_hasmorerecords:
+                    v_data1 = v_database.v_connection.QueryBlock(v_sql, 1000, False, True)
+                    if v_database.v_connection.v_start:
+                        f.Write(v_data1)
+                        v_hasmorerecords = False
+                    elif len(v_data1.Rows) > 0:
+                        f.Write(v_data1)
+                        v_hasmorerecords = True
+                    else:
+                        v_hasmorerecords = False
+
+                v_database.v_connection.Close()
                 f.Flush()
 
                 log_end_time = datetime.now()
                 v_duration = GetDuration(log_start_time,log_end_time)
 
                 v_response['v_data'] = {
-                    'v_filename': '/static/temp/{0}'.format(v_file_name),
+                    'v_filename': settings.PATH + '/static/temp/{0}'.format(v_file_name),
                     'v_downloadname': 'omnidb_exported.{0}'.format(v_extension),
                     'v_duration': v_duration,
                     'v_inserted_id': v_inserted_id,
+                    'v_con_status': v_database.v_connection.GetConStatus(),
                     'v_chunks': False
                 }
 
                 if not self.cancel:
-                    tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+                    ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
             else:
-
                 if v_mode==0:
-                    v_database.v_connection.Open()
+                    v_database.v_connection.v_autocommit = v_autocommit
+                    if not v_database.v_connection.v_con or v_database.v_connection.GetConStatus() == 0:
+                        v_database.v_connection.Open()
+                    else:
+                        v_database.v_connection.v_start=True
 
                 if (v_mode==0 or v_mode==1) and not v_all_data:
+
                     v_data1 = v_database.v_connection.QueryBlock(v_sql, 50, True, True)
+
+                    v_notices = v_database.v_connection.GetNotices()
+                    v_notices_text = ''
+                    v_notices_length = len(v_notices)
+                    if v_notices_length > 0:
+                        for v_notice in v_notices:
+                            v_notices_text += v_notice.replace('\n','<br/>')
+                    v_database.v_connection.ClearNotices()
+
+                    log_end_time = datetime.now()
+                    v_duration = GetDuration(log_start_time,log_end_time)
+
+                    v_response['v_data'] = {
+                        'v_col_names' : v_data1.Columns,
+                        'v_data' : v_data1.Rows,
+                        'v_last_block': True,
+                        'v_duration': v_duration,
+                        'v_notices': v_notices_text,
+                        'v_notices_length': v_notices_length,
+                        'v_inserted_id': v_inserted_id,
+                        'v_status': v_database.v_connection.GetStatus(),
+                        'v_con_status': v_database.v_connection.GetConStatus(),
+                        'v_chunks': True
+                    }
+
+                    if not self.cancel:
+                        ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+
+                    #if len(v_data1.Rows) < 50 and v_autocommit:
+                    #    try:
+                    #        v_database.v_connection.Close()
+                    #    except:
+                    #        pass
+
                 elif v_mode==2 or v_all_data:
-                    v_data1 = v_database.v_connection.QueryBlock(v_sql, -1, True, True)
 
-                v_notices = v_database.v_connection.GetNotices()
-                v_notices_text = ''
-                if len(v_notices) > 0:
-                    for v_notice in v_notices:
-                        v_notices_text += v_notice.replace('\n','<br/>')
+                    v_hasmorerecords = True
+                    k = 0
+                    while v_hasmorerecords:
 
-                if v_mode==2 or v_all_data or len(v_data1.Rows)<50:
-                    try:
-                        v_database.v_connection.Close()
-                    except:
-                        pass
+                        k = k + 1
 
+                        v_data1 = v_database.v_connection.QueryBlock(v_sql, 10000, True, True)
+
+                        v_notices = v_database.v_connection.GetNotices()
+                        v_notices_text = ''
+                        v_notices_length = len(v_notices)
+                        if v_notices_length > 0:
+                            for v_notice in v_notices:
+                                v_notices_text += v_notice.replace('\n','<br/>')
+                        v_database.v_connection.ClearNotices()
+
+                        log_end_time = datetime.now()
+                        v_duration = GetDuration(log_start_time,log_end_time)
+
+                        v_response['v_data'] = {
+                            'v_col_names' : v_data1.Columns,
+                            'v_data' : v_data1.Rows,
+                            'v_last_block': False,
+                            #'v_query_info' : "Number of records: {0}".format(len(v_data1.Rows)),
+                            'v_duration': v_duration,
+                            'v_notices': v_notices_text,
+                            'v_notices_length': v_notices_length,
+                            'v_inserted_id': v_inserted_id,
+                            'v_status': '',
+                            'v_con_status': 0,
+                            'v_chunks': True
+                        }
+
+                        if v_database.v_connection.v_start:
+                            v_hasmorerecords = False
+                        elif len(v_data1.Rows) > 0:
+                            v_hasmorerecords = True
+                        else:
+                            v_hasmorerecords = False
+
+                        if self.cancel:
+                            break
+                        elif v_hasmorerecords:
+                            ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+
+                    if not self.cancel:
+
+                        v_notices = v_database.v_connection.GetNotices()
+                        v_notices_text = ''
+                        if len(v_notices) > 0:
+                            for v_notice in v_notices:
+                                v_notices_text += v_notice.replace('\n','<br/>')
+
+                        log_end_time = datetime.now()
+                        v_duration = GetDuration(log_start_time,log_end_time)
+
+                        v_response['v_data'] = {
+                            'v_col_names' : v_data1.Columns,
+                            'v_data' : v_data1.Rows,
+                            'v_last_block': True,
+                            #'v_query_info' : "Number of records: {0}".format(len(v_data1.Rows)),
+                            'v_duration': v_duration,
+                            'v_notices': v_notices_text,
+                            'v_notices_length': len(v_notices),
+                            'v_inserted_id': v_inserted_id,
+                            'v_status': v_database.v_connection.GetStatus(),
+                            'v_con_status': v_database.v_connection.GetConStatus(),
+                            'v_chunks': True
+                        }
+
+                        ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+
+                elif v_mode==3 or v_mode==4:
+                    v_duration = GetDuration(log_start_time,log_end_time)
+                    #commit
+                    if v_mode==3:
+                        v_database.v_connection.Query('COMMIT;',True)
+                    else:
+                        v_database.v_connection.Query('ROLLBACK;',True)
+                    v_response['v_data'] = {
+                        'v_col_names' : None,
+                        'v_data' : [],
+                        'v_last_block': True,
+                        #'v_query_info' : "",
+                        'v_duration': v_duration,
+                        'v_notices': "",
+                        'v_notices_length': 0,
+                        'v_inserted_id': v_inserted_id,
+                        'v_status': v_database.v_connection.GetStatus(),
+                        'v_con_status': v_database.v_connection.GetConStatus(),
+                        'v_chunks': False
+                    }
+                    ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+        except Exception as exc:
+            if not self.cancel:
+                try:
+                    v_notices = v_database.v_connection.GetNotices()
+                    v_notices_text = ''
+                    if len(v_notices) > 0:
+                        for v_notice in v_notices:
+                            v_notices_text += v_notice.replace('\n','<br/>')
+                except:
+                    v_notices = []
+                    v_notices_text = ''
+                #try:
+                #    v_database.v_connection.Close()
+                #except:
+                #    pass
                 log_end_time = datetime.now()
                 v_duration = GetDuration(log_start_time,log_end_time)
-
+                log_status = 'error'
                 v_response['v_data'] = {
-                    'v_col_names' : v_data1.Columns,
-                    'v_data' : v_data1.Rows,
-                    'v_last_block': True,
-                    'v_query_info' : "Number of records: {0}".format(len(v_data1.Rows)),
+                    'position': v_database.GetErrorPosition(str(exc)),
+                    'message' : str(exc).replace('\n','<br>'),
                     'v_duration': v_duration,
                     'v_notices': v_notices_text,
                     'v_notices_length': len(v_notices),
                     'v_inserted_id': v_inserted_id,
-                    'v_chunks': True
+                    'v_status': 0,
+                    'v_con_status': v_database.v_connection.GetConStatus(),
+                    'v_chunks': False
                 }
+                v_response['v_error'] = True
 
-                #send data in chunks to avoid blocking the websocket server
-                chunks = [v_data1.Rows[x:x+1000] for x in range(0, len(v_data1.Rows), 1000)]
-                if len(chunks)>0:
-                    for count in range(0,len(chunks)):
-                        if self.cancel:
-                            break
-                        if not count==len(chunks)-1:
-                            v_response['v_data'] = {
-                                'v_col_names' : v_data1.Columns,
-                                'v_data' : chunks[count],
-                                'v_last_block': False,
-                                'v_query_info' : "Number of records: {0}".format(len(v_data1.Rows)),
-                                'v_duration': v_duration,
-                                'v_notices': v_notices_text,
-                                'v_notices_length': len(v_notices),
-                                'v_inserted_id': v_inserted_id,
-                                'v_chunks': True
-                            }
-                        else:
-                            v_response['v_data'] = {
-                                'v_col_names' : v_data1.Columns,
-                                'v_data' : chunks[count],
-                                'v_last_block': True,
-                                'v_query_info' : "Number of records: {0}".format(len(v_data1.Rows)),
-                                'v_duration': v_duration,
-                                'v_notices': v_notices_text,
-                                'v_notices_length': len(v_notices),
-                                'v_inserted_id': v_inserted_id,
-                                'v_chunks': True
-                            }
-                        if not self.cancel:
-                            tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
-                else:
-                    if not self.cancel:
-                        tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
-
-        except Exception as exc:
-            try:
-                v_database.v_connection.Close()
-            except:
-                pass
-            log_end_time = datetime.now()
-            v_duration = GetDuration(log_start_time,log_end_time)
-            log_status = 'error'
-            v_response['v_data'] = {
-                'position': v_database.GetErrorPosition(str(exc)),
-                'message' : str(exc).replace('\n','<br>'),
-                'v_duration': v_duration,
-                'v_inserted_id': v_inserted_id,
-                'v_chunks': False
-            }
-            v_response['v_error'] = True
-
-            if not self.cancel:
-                tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+                ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
         #Log to history
         if v_mode==0 and v_log_query:
@@ -844,7 +1156,8 @@ def thread_query(self,args,ws_object):
                     log_start_time,
                     log_end_time,
                     v_duration,
-                    log_status)
+                    log_status,
+                    ws_object.v_session.v_databases[v_tab_object['database_index']]['database'].v_conn_id)
 
         #if mode=0 save tab
         if v_mode==0 and v_tab_object['tab_db_id'] and v_log_query:
@@ -852,9 +1165,10 @@ def thread_query(self,args,ws_object):
                 v_omnidb_database.v_connection.Execute('''
                 update tabs
                 set conn_id = {0},
-                    snippet = '{1}'
-                where tab_id = {2}
-                '''.format(ws_object.v_session.v_databases[v_tab_object['database_index']]['database'].v_conn_id, v_tab_object['sql_save'].replace("'","''"), v_tab_object['tab_db_id']))
+                    snippet = '{1}',
+                    title = '{2}'
+                where tab_id = {3}
+                '''.format(ws_object.v_session.v_databases[v_tab_object['database_index']]['database'].v_conn_id, v_tab_object['sql_save'].replace("'","''"),v_tab_title.replace("'","''"), v_tab_object['tab_db_id']))
             except Exception as exc:
                 None
     except Exception as exc:
@@ -862,7 +1176,7 @@ def thread_query(self,args,ws_object):
         v_response['v_error'] = True
         v_response['v_data'] = traceback.format_exc().replace('\n','<br>')
         if not self.cancel:
-            tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+            ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
 def thread_console(self,args,ws_object):
     v_response = {
@@ -877,6 +1191,8 @@ def thread_console(self,args,ws_object):
         v_sql            = args['v_sql_cmd']
         v_tab_id         = args['v_tab_id']
         v_tab_object     = args['v_tab_object']
+        v_autocommit     = args['v_autocommit']
+        v_mode           = args['v_mode']
 
         #Removing last character if it is a semi-colon
         if v_sql[-1:]==';':
@@ -899,36 +1215,73 @@ def thread_console(self,args,ws_object):
         log_status = 'success'
 
         try:
-
-            #PATTERN = re.compile(r'''((?:[^;'"\$]|"[^"]*"|"[^"]*|'[^']*'|'[^']*|(?P<quoted_string>\$[^\$]*\$).*(?P=quoted_string)|\$[^\$]*\$.*)+)''', re.DOTALL)
-            #list_sql = PATTERN.split(v_sql)[1::3]
             list_sql = sqlparse.split(v_sql)
 
             v_data_return = ''
+            run_command_list = True
 
-            for sql in list_sql:
+            if v_mode==0:
+                v_database.v_connection.v_autocommit = v_autocommit
+                if not v_database.v_connection.v_con or v_database.v_connection.GetConStatus() == 0:
+                    v_database.v_connection.Open()
+                else:
+                    v_database.v_connection.v_start=True
 
-                try:
-                    formated_sql = sql.strip()
-                    v_data_return += '\n>> ' + formated_sql + '\n'
+            if v_mode == 1 or v_mode ==2:
+                v_table = v_database.v_connection.QueryBlock('', 50, True, True)
+                #need to stop again
+                if not v_database.v_connection.v_start or len(v_table.Rows)>=50:
+                    v_data_return += '\n' + v_table.Pretty(v_database.v_connection.v_expanded) + '\n' + v_database.v_connection.GetStatus()
+                    run_command_list = False
+                    v_show_fetch_button = True
+                else:
+                    v_data_return += '\n' + v_table.Pretty(v_database.v_connection.v_expanded) + '\n' + v_database.v_connection.GetStatus()
+                    run_command_list = True
+                    list_sql = v_tab_object['remaining_commands']
 
-                    if not v_database.v_connection.v_con:
-                        v_database.v_connection.Open()
+            if v_mode == 3:
+                run_command_list = True
+                list_sql = v_tab_object['remaining_commands']
 
-                    v_database.v_connection.ClearNotices()
-                    v_data1 = v_database.v_connection.Special(sql);
+            if run_command_list:
+                counter = 0
+                v_show_fetch_button = False
+                for sql in list_sql:
+                    counter = counter + 1
+                    try:
+                        formated_sql = sql.strip()
+                        v_data_return += '\n>> ' + formated_sql + '\n'
 
-                    v_notices = v_database.v_connection.GetNotices()
-                    v_notices_text = ''
-                    if len(v_notices) > 0:
-                        for v_notice in v_notices:
-                            v_notices_text += v_notice
-                        v_data_return += v_notices_text
+                        v_database.v_connection.ClearNotices()
+                        v_database.v_connection.v_start=True
+                        v_data1 = v_database.v_connection.Special(sql);
 
-                    v_data_return += v_data1
-                except Exception as exc:
-                    v_data_return += str(exc)
+                        v_notices = v_database.v_connection.GetNotices()
+                        v_notices_text = ''
+                        if len(v_notices) > 0:
+                            for v_notice in v_notices:
+                                v_notices_text += v_notice
+                            v_data_return += v_notices_text
 
+                        v_data_return += v_data1
+
+                        if v_database.v_use_server_cursor:
+                            if v_database.v_connection.v_last_fetched_size == 50:
+                                v_tab_object['remaining_commands'] = list_sql[counter:]
+                                v_show_fetch_button = True
+                                break
+                    except Exception as exc:
+                        try:
+                            v_notices = v_database.v_connection.GetNotices()
+                            v_notices_text = ''
+                            if len(v_notices) > 0:
+                                for v_notice in v_notices:
+                                    v_notices_text += v_notice
+                                v_data_return += v_notices_text
+                        except Exception as exc:
+                            None
+                        v_data_return += str(exc)
+                    v_tab_object['remaining_commands'] = []
 
             log_end_time = datetime.now()
             v_duration = GetDuration(log_start_time,log_end_time)
@@ -949,19 +1302,23 @@ def thread_console(self,args,ws_object):
                         v_response['v_data'] = {
                             'v_data' : chunks[count],
                             'v_last_block': False,
-                            'v_duration': v_duration
+                            'v_duration': v_duration,
+                            'v_show_fetch_button': v_show_fetch_button,
+                            'v_con_status': '',
                         }
                     else:
                         v_response['v_data'] = {
                             'v_data' : chunks[count],
                             'v_last_block': True,
-                            'v_duration': v_duration
+                            'v_duration': v_duration,
+                            'v_show_fetch_button': v_show_fetch_button,
+                            'v_con_status': v_database.v_connection.GetConStatus(),
                         }
                     if not self.cancel:
-                        tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+                        ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
             else:
                 if not self.cancel:
-                    tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+                    ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
             try:
                 v_database.v_connection.ClearNotices()
@@ -981,49 +1338,51 @@ def thread_console(self,args,ws_object):
             }
 
             if not self.cancel:
-                tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+                ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
-        #logging to console history
-        v_omnidb_database.v_connection.Open()
-        v_omnidb_database.v_connection.Execute('BEGIN TRANSACTION')
-        v_omnidb_database.v_connection.Execute('''
-            insert into console_history values (
-            {0},
-            {1},
-            '{2}',
-            DATETIME('now'))
-        '''.format(v_session.v_user_id,
-                   v_database.v_conn_id,
-                   v_sql.replace("'","''")))
+        if v_mode == 0:
+            #logging to console history
+            v_omnidb_database.v_connection.Open()
+            v_omnidb_database.v_connection.Execute('BEGIN TRANSACTION')
+            v_omnidb_database.v_connection.Execute('''
+                insert into console_history values (
+                {0},
+                {1},
+                '{2}',
+                DATETIME('now'))
+            '''.format(v_session.v_user_id,
+                       v_database.v_conn_id,
+                       v_sql.replace("'","''")))
 
-        #keep 100 rows in console history table for current user/connection
-        v_omnidb_database.v_connection.Execute('''
-            delete
-            from console_history
-            where command_date not in (
-                select command_date
+            #keep 100 rows in console history table for current user/connection
+            v_omnidb_database.v_connection.Execute('''
+                delete
                 from console_history
-                where user_id = {0}
-                  and conn_id = {1}
-                order by command_date desc
-                limit 100
-            )
-            and user_id = {0}
-            and conn_id = {1}
-        '''.format(v_session.v_user_id,
-                   v_database.v_conn_id,
-                   v_sql.replace("'","''")))
+                where command_date not in (
+                    select command_date
+                    from console_history
+                    where user_id = {0}
+                      and conn_id = {1}
+                    order by command_date desc
+                    limit 100
+                )
+                and user_id = {0}
+                and conn_id = {1}
+            '''.format(v_session.v_user_id,
+                       v_database.v_conn_id,
+                       v_sql.replace("'","''")))
 
-        #Log to history
-        LogHistory(v_omnidb_database,
-                v_session.v_user_id,
-                v_session.v_user_name,
-                v_sql,
-                log_start_time,
-                log_end_time,
-                v_duration,
-                log_status)
-        v_omnidb_database.v_connection.Close()
+            #Log to history
+            LogHistory(v_omnidb_database,
+                    v_session.v_user_id,
+                    v_session.v_user_name,
+                    v_sql,
+                    log_start_time,
+                    log_end_time,
+                    v_duration,
+                    log_status,
+                    v_database.v_conn_id)
+            v_omnidb_database.v_connection.Close()
 
     except Exception as exc:
         logger.error('''*** Exception ***\n{0}'''.format(traceback.format_exc()))
@@ -1032,7 +1391,74 @@ def thread_console(self,args,ws_object):
             'v_duration': ''
         }
         if not self.cancel:
-            tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+            ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+
+def thread_terminal(self,args,ws_object):
+    v_response = {
+        'v_code': response.TerminalResult,
+        'v_context_code': args['v_context_code'],
+        'v_error': False,
+        'v_data': 1
+    }
+
+    try:
+        v_cmd             = args['v_cmd']
+        v_tab_id          = args['v_tab_id']
+        v_tab_object      = args['v_tab_object']
+        v_terminal_object = v_tab_object['terminal_object']
+        v_terminal_ssh_client = v_tab_object['terminal_ssh_client']
+
+        while not self.cancel:
+            try:
+                if v_tab_object['terminal_type'] == 'local':
+                    v_data_return = v_terminal_object.read_nonblocking(size=1024)
+                else:
+                    v_data_return = v_terminal_object.read_current()
+
+                v_response['v_data'] = {
+                    'v_data' : v_data_return,
+                    'v_last_block': True
+                }
+
+                #send data in chunks to avoid blocking the websocket server
+                chunks = [v_data_return[x:x+10000] for x in range(0, len(v_data_return), 10000)]
+
+                if len(chunks)>0:
+                    for count in range(0,len(chunks)):
+                        if self.cancel:
+                            break
+                        if not count==len(chunks)-1:
+                            v_response['v_data'] = {
+                                'v_data' : chunks[count],
+                                'v_last_block': False
+                            }
+                        else:
+                            v_response['v_data'] = {
+                                'v_data' : chunks[count],
+                                'v_last_block': True
+                            }
+                        if not self.cancel:
+                            ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+                else:
+                    if not self.cancel:
+                        ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+
+            except Exception as exc:
+                transport = v_terminal_ssh_client.get_transport()
+                if transport == None or transport.is_active() == False:
+                    break
+                if 'EOF' in str(exc):
+                    break
+
+
+    except Exception as exc:
+        logger.error('''*** Exception ***\n{0}'''.format(traceback.format_exc()))
+        v_response['v_data'] = {
+            'v_data': str(exc),
+            'v_duration': ''
+        }
+        if not self.cancel:
+            ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
 def thread_query_edit_data(self,args,ws_object):
     v_response = {
@@ -1084,7 +1510,7 @@ def thread_query_edit_data(self,args,ws_object):
                 for j in range(0, len(v_pk_list)):
                     v_pk_col = {}
                     v_pk_col['v_column'] = v_pk_list[j]['v_column']
-                    v_pk_col['v_value'] = v_row[v_pk_list[j]['v_column']]
+                    v_pk_col['v_value'] = v_row[v_pk_list[j]['v_column'].replace('"','')]
                     v_row_pk.append(v_pk_col)
                 v_response['v_data']['v_row_pk'].append(v_row_pk)
 
@@ -1098,13 +1524,13 @@ def thread_query_edit_data(self,args,ws_object):
             v_response['v_error'] = True
 
         if not self.cancel:
-            tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+            ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
     except Exception as exc:
         logger.error('''*** Exception ***\n{0}'''.format(traceback.format_exc()))
         v_response['v_error'] = True
         v_response['v_data'] = traceback.format_exc().replace('\n','<br>')
         if not self.cancel:
-            ws_object.write_message(json.dumps(v_response))
+            ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
 def thread_save_edit_data(self,args,ws_object):
     v_response = {
@@ -1158,9 +1584,9 @@ def thread_save_edit_data(self,args,ws_object):
                             break
 
                     if v_pk_info[v_pk_index]['v_class'] == 'numeric':
-                        v_command = v_command + v_pk_info[v_pk_index]['v_compareformat'].replace('#', v_pk['v_column'] + ' = ' + str(v_pk['v_value']))
+                        v_command = v_command + v_pk_info[v_pk_index]['v_compareformat'].replace('#', str(v_pk['v_column'])) + ' = ' + v_pk_info[v_pk_index]['v_compareformat'].replace('#', str(v_pk['v_value']))
                     else:
-                        v_command = v_command + v_pk_info[v_pk_index]['v_compareformat'].replace('#', v_pk['v_column'] + " = '" + str(v_pk['v_value']) + "'")
+                        v_command = v_command + v_pk_info[v_pk_index]['v_compareformat'].replace('#', str(v_pk['v_column'])) + ' = ' + v_pk_info[v_pk_index]['v_compareformat'].replace('#', "'" + str(v_pk['v_value']) + "'")
 
                 v_row_info_return = {}
                 v_row_info_return['mode'] = -1
@@ -1288,13 +1714,13 @@ def thread_save_edit_data(self,args,ws_object):
             i = i + 1
 
         if not self.cancel:
-            tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+            ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
     except Exception as exc:
         logger.error('''*** Exception ***\n{0}'''.format(traceback.format_exc()))
         v_response['v_error'] = True
         v_response['v_data'] = traceback.format_exc().replace('\n','<br>')
         if not self.cancel:
-            ws_object.write_message(json.dumps(v_response))
+            ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
 
 def thread_debug_run_func(self,args,ws_object):
@@ -1310,11 +1736,14 @@ def thread_debug_run_func(self,args,ws_object):
 
     try:
         #enable debugger for current connection
-        v_conn_string = "port={0} dbname=''{1}'' user=''{2}''".format(args['v_port'],v_database_debug.v_service,v_database_debug.v_user);
+        v_conn_string = "host=localhost port={0} dbname=''{1}'' user=''{2}''".format(args['v_port'],v_database_debug.v_service,v_database_debug.v_user);
         v_database_debug.v_connection.Execute("select omnidb.omnidb_enable_debugger('{0}')".format(v_conn_string))
 
         #run function it will lock until the function ends
-        v_func_return = v_database_debug.v_connection.Query('select * from {0} limit 1000'.format(args['v_function']),True)
+        if args['v_type'] == 'f':
+            v_func_return = v_database_debug.v_connection.Query('select * from {0} limit 1000'.format(args['v_function']),True)
+        else:
+            v_func_return = v_database_debug.v_connection.Query('call {0}'.format(args['v_function']),True)
 
         #Not cancelled, return all data
         if not v_tab_object['cancelled']:
@@ -1328,11 +1757,10 @@ def thread_debug_run_func(self,args,ws_object):
             #retrieve statistics summary
             v_statistics_summary = v_database_debug.v_connection.Query('''
             select lineno, max(msec) as msec
-            from (select lineno,coalesce(trunc((extract("epoch" from tend)  - extract("epoch" from tstart))::numeric,4),0) as msec from omnidb.statistics where pid = {0}) t
+            from (select lineno,coalesce(trunc((extract("epoch" from tend) - extract("epoch" from tstart))::numeric,4),0) as msec from omnidb.statistics where pid = {0}) t
             group by lineno
             order by lineno
             '''.format(v_tab_object['debug_pid']),True)
-
 
             #retrieve notices
             v_notices = v_database_debug.v_connection.GetNotices()
@@ -1359,7 +1787,7 @@ def thread_debug_run_func(self,args,ws_object):
             #send debugger finished message
             v_response['v_code'] = response.DebugResponse
 
-            tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+            ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
         #Cancelled, return cancelled status
         else:
             v_response['v_code'] = response.DebugResponse
@@ -1368,7 +1796,7 @@ def thread_debug_run_func(self,args,ws_object):
                 'v_remove_context': True,
                 'v_error': False
             }
-            tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+            ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
     except Exception as exc:
         #Not cancelled
@@ -1389,7 +1817,7 @@ def thread_debug_run_func(self,args,ws_object):
             except Exception:
                 None
 
-            tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+            ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
         else:
             v_response['v_code'] = response.DebugResponse
             v_response['v_data'] = {
@@ -1397,7 +1825,7 @@ def thread_debug_run_func(self,args,ws_object):
                 'v_remove_context': True,
                 'v_error': False
             }
-            tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+            ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
 
 def thread_debug(self,args,ws_object):
@@ -1436,7 +1864,7 @@ def thread_debug(self,args,ws_object):
             v_tab_object['debug_pid'] = pid
 
             #Run thread that will execute the function
-            t = StoppableThread(thread_debug_run_func,{ 'v_tab_object': v_tab_object, 'v_context_code': args['v_context_code'], 'v_function': args['v_function'], 'v_port': args['v_port']},ws_object)
+            t = StoppableThread(thread_debug_run_func,{ 'v_tab_object': v_tab_object, 'v_context_code': args['v_context_code'], 'v_function': args['v_function'], 'v_type': args['v_type'], 'v_port': args['v_port']},ws_object)
             v_tab_object['thread'] = t
             #t.setDaemon(True)
             t.start()
@@ -1462,7 +1890,7 @@ def thread_debug(self,args,ws_object):
                 'v_variables': v_variables.Rows,
                 'v_lineno': v_lineno
                 }
-                tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+                ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
         elif v_state == debugState.Step:
 
@@ -1484,16 +1912,16 @@ def thread_debug(self,args,ws_object):
                     'v_variables': v_variables.Rows,
                     'v_lineno': v_context_data.Rows[0][0]
                     }
-                    tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+                    ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
                 else:
                     v_database_control.v_connection.Execute('select pg_advisory_unlock({0}) from omnidb.contexts where pid = {0};'.format(v_tab_object['debug_pid']))
                     v_database_control.v_connection.Close()
                     v_response['v_code'] = response.RemoveContext
-                    tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+                    ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
             except Exception:
                 v_response['v_code'] = response.RemoveContext
-                tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+                ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
 
         #Cancelling debugger, the thread executing the function will return the cancel status
         elif v_state == debugState.Cancel:
@@ -1501,7 +1929,6 @@ def thread_debug(self,args,ws_object):
             v_database_control.v_connection.Cancel(False)
             v_database_control.v_connection.Terminate(v_tab_object['debug_pid'])
             v_database_control.v_connection.Close()
-
 
     except Exception as exc:
         v_response['v_code'] = response.DebugResponse
@@ -1518,4 +1945,4 @@ def thread_debug(self,args,ws_object):
         except Exception:
             None
 
-        tornado.ioloop.IOLoop.instance().add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))
+        ws_object.event_loop.add_callback(send_response_thread_safe,ws_object,json.dumps(v_response))

@@ -22,6 +22,9 @@ from RestrictedPython.Utilities import utility_builtins
 from RestrictedPython.Eval import default_guarded_getitem
 from RestrictedPython.Eval import RestrictionCapableEval
 
+#load plugins to retrieve list of monitoring units of all loaded plugins
+from OmniDB_app.views.plugins import monitoring_units
+
 def get_monitor_nodes(request):
 
     v_return = {}
@@ -82,6 +85,7 @@ def get_monitor_unit_list(request):
     json_object = json.loads(request.POST.get('data', None))
     v_database_index = json_object['p_database_index']
     v_tab_id = json_object['p_tab_id']
+    v_mode = json_object['p_mode']
 
     v_database = v_session.v_tab_connections[v_tab_id]
 
@@ -92,6 +96,7 @@ def get_monitor_unit_list(request):
           when 'chart' then 'Chart'
           when 'chart_append' then 'Chart (Append)'
           when 'grid' then 'Grid'
+          when 'graph' then 'Graph'
         end type,
         user_id,
         interval
@@ -107,15 +112,44 @@ def get_monitor_unit_list(request):
     v_id_list = []
 
     try:
+        #plugins units
+        for mon_unit in monitoring_units:
+            if mon_unit['dbms'] == v_database.v_db_type:
+                v_actions = '''
+                <i title='Edit' class='fas fa-check-circle action-grid action-check' onclick='includeMonitorUnit({0},"{1}")'></i>
+                '''.format(mon_unit['id'],mon_unit['plugin_name'])
+                if mon_unit['type'] == 'chart':
+                    v_type = 'Chart'
+                elif mon_unit['type'] == 'chart_append':
+                    v_type = 'Chart (Append)'
+                elif mon_unit['type'] == 'grid':
+                    v_type = 'Grid'
+                elif mon_unit['type'] == 'graph':
+                    v_type = 'Graph'
+                if v_mode==0:
+                    v_data.append([v_actions,mon_unit['title'],v_type,mon_unit['interval']])
+                else:
+                    v_data.append([mon_unit['plugin_name'],mon_unit['title'],v_type])
+                v_id_list.append(mon_unit['id'])
+
+
         v_units = v_session.v_omnidb_database.v_connection.Query(v_query)
         for v_unit in v_units.Rows:
-            v_actions = '<img src="/static/OmniDB_app/images/select.png" class="img_ht" onclick="includeMonitorUnit({0})"/>'.format(v_unit['unit_id'])
+            v_actions = '''
+            <i title='Edit' class='fas fa-check-circle action-grid action-check' onclick='includeMonitorUnit({0})'></i>
+            '''.format(v_unit['unit_id'])
             #custom unit, add edit and delete actions
             if v_unit['user_id']!=None:
-                v_actions += '''<img src="/static/OmniDB_app/images/text_edit.png" class="img_ht" onclick="editMonitorUnit({0})"/>
-                <img src="/static/OmniDB_app/images/tab_close.png" class="img_ht" onclick="deleteMonitorUnit({0})"/>'''.format(v_unit['unit_id'])
+                v_actions += '''
+                <i title='Edit' class='fas fa-edit action-grid action-edit-monitor' onclick='editMonitorUnit({0})'></i>
+                <i title='Delete' class='fas fa-times action-grid action-close' onclick='deleteMonitorUnit({0})'></i>
+                '''.format(v_unit['unit_id'])
 
-            v_data.append([v_actions,v_unit['title'],v_unit['type'],v_unit['interval']])
+            if v_mode==0:
+                v_data.append([v_actions,v_unit['title'],v_unit['type'],v_unit['interval']])
+            else:
+                v_data.append(['',v_unit['title'],v_unit['type']])
+
             v_id_list.append(v_unit['unit_id'])
         v_return['v_data'] = { 'id_list': v_id_list, 'data': v_data }
 
@@ -189,21 +223,60 @@ def get_monitor_units(request):
 
     v_return['v_data'] = []
 
-    #saving units for current user/connection if there is none
+    #saving units for current user/connection if there are none
     v_query = '''
-        select count(*)
-        from mon_units mu,units_users_connections uuc
-        where mu.dbt_st_name = '{0}'
-          and uuc.unit_id = mu.unit_id
-          and uuc.user_id = {1}
-          and uuc.conn_id = {2}
+        select *
+        from (
+        select uuc.uuc_id,mu.unit_id, mu.title, uuc.interval, uuc.plugin_name
+            from mon_units mu,units_users_connections uuc
+            where mu.dbt_st_name = '{0}'
+              and uuc.unit_id = mu.unit_id
+              and uuc.user_id = {1}
+              and uuc.conn_id = {2}
+              and uuc.plugin_name = ''
+        union all
+        select uuc.uuc_id,uuc.unit_id, '' as title, uuc.interval, uuc.plugin_name
+            from units_users_connections uuc
+            where uuc.user_id = {1}
+              and uuc.conn_id = {2}
+              and uuc.plugin_name <> '')
+        order by uuc_id desc;
     '''.format(v_database.v_db_type,v_session.v_user_id,v_database.v_conn_id)
 
     try:
-        v_count = v_session.v_omnidb_database.v_connection.ExecuteScalar(v_query)
+        v_count = 0
+        v_existing_units = v_session.v_omnidb_database.v_connection.Query(v_query)
+        v_existing_data = []
+
+        for v_unit in v_existing_units.Rows:
+            if v_unit['plugin_name']=='':
+                v_existing_data.append(
+                {
+                    'uuc_id': v_unit['uuc_id'],
+                    'unit_id': v_unit['unit_id'],
+                    'title': v_unit['title'],
+                    'interval': v_unit['interval'],
+                    'plugin_name': v_unit['plugin_name'],
+                }
+                )
+            else:
+                #search plugin data
+                unit_data = None
+                for mon_unit in monitoring_units:
+                    if mon_unit['id'] == v_unit['unit_id'] and mon_unit['plugin_name'] == v_unit['plugin_name'] and mon_unit['dbms'] == v_database.v_db_type:
+                        v_existing_data.append(
+                        {
+                            'uuc_id': v_unit['uuc_id'],
+                            'unit_id': v_unit['unit_id'],
+                            'title': mon_unit['title'],
+                            'interval': v_unit['interval'],
+                            'plugin_name': v_unit['plugin_name'],
+                        }
+                        )
+                        break
 
         #save default units
-        if v_count == 0:
+        if len(v_existing_data) == 0:
             v_query = '''
                 select mu.unit_id, mu.interval
                 from mon_units mu
@@ -221,37 +294,39 @@ def get_monitor_units(request):
                         {0},
                         {1},
                         {2},
-                        {3});
+                        {3},
+                        '');
                 '''.format(v_unit['unit_id'],v_session.v_user_id,v_database.v_conn_id,v_unit['interval']));
+
+            #Saving default plugin units
+            for mon_unit in monitoring_units:
+                if mon_unit['default'] == True and mon_unit['dbms'] == v_database.v_db_type:
+                    v_session.v_omnidb_database.v_connection.Execute('''
+                        insert into units_users_connections values
+                            ((select coalesce(max(uuc_id), 0) + 1 from units_users_connections),
+                            {0},
+                            {1},
+                            {2},
+                            {3},
+                            '{4}');
+                    '''.format(mon_unit['id'],v_session.v_user_id,v_database.v_conn_id,mon_unit['interval'],mon_unit['plugin_name']));
 
             v_session.v_omnidb_database.v_connection.Execute('COMMIT;');
             v_session.v_omnidb_database.v_connection.Close();
 
-    except Exception as exc:
-        v_return['v_data'] = str(exc)
-        v_return['v_error'] = True
-        return JsonResponse(v_return)
+            return get_monitor_units(request)
 
-    v_query = '''
-        select uuc.uuc_id,mu.unit_id, mu.title, uuc.interval
-        from mon_units mu,units_users_connections uuc
-        where mu.dbt_st_name = '{0}'
-          and uuc.unit_id = mu.unit_id
-          and uuc.user_id = {1}
-          and uuc.conn_id = {2}
-        order by uuc_id desc
-    '''.format(v_database.v_db_type,v_session.v_user_id,v_database.v_conn_id)
+        else:
 
-    try:
-        v_units = v_session.v_omnidb_database.v_connection.Query(v_query)
-        for v_unit in v_units.Rows:
-            v_unit_data = {
-                'v_saved_id': v_unit['uuc_id'],
-                'v_id': v_unit['unit_id'],
-                'v_title': v_unit['title'],
-                'v_interval': v_unit['interval']
-            }
-            v_return['v_data'].append(v_unit_data)
+            for v_unit in v_existing_data:
+                v_unit_data = {
+                    'v_saved_id': v_unit['uuc_id'],
+                    'v_id': v_unit['unit_id'],
+                    'v_title': v_unit['title'],
+                    'v_plugin_name': v_unit['plugin_name'],
+                    'v_interval': v_unit['interval']
+                }
+                v_return['v_data'].append(v_unit_data)
 
     except Exception as exc:
         v_return['v_data'] = str(exc)
@@ -277,21 +352,35 @@ def get_monitor_unit_template(request):
 
     json_object = json.loads(request.POST.get('data', None))
     v_unit_id = json_object['p_unit_id']
+    v_unit_plugin_name = json_object['p_unit_plugin_name']
 
-    v_query = '''
-        select coalesce(script_chart,'') as script_chart, coalesce(script_data,'') as script_data, type, interval
-        from mon_units where unit_id = '{0}'
-    '''.format(v_unit_id)
+    if v_unit_plugin_name=='':
+        v_query = '''
+            select coalesce(script_chart,'') as script_chart, coalesce(script_data,'') as script_data, type, interval
+            from mon_units where unit_id = '{0}'
+        '''.format(v_unit_id)
 
-    v_return['v_data'] = ''
+        v_return['v_data'] = ''
 
-    try:
-        v_return['v_data'] = v_session.v_omnidb_database.v_connection.Query(v_query).Rows[0]
+        try:
+            v_return['v_data'] = v_session.v_omnidb_database.v_connection.Query(v_query).Rows[0]
 
-    except Exception as exc:
-        v_return['v_data'] = str(exc)
-        v_return['v_error'] = True
-        return JsonResponse(v_return)
+        except Exception as exc:
+            v_return['v_data'] = str(exc)
+            v_return['v_error'] = True
+            return JsonResponse(v_return)
+    else:
+        #search plugin data
+        for mon_unit in monitoring_units:
+            if mon_unit['id'] == v_unit_id and mon_unit['plugin_name'] == v_unit_plugin_name:
+                unit_data = mon_unit
+                v_return['v_data'] = {
+                    'interval': unit_data['interval'],
+                    'script_chart': unit_data['script_chart'],
+                    'script_data': unit_data['script_data'],
+                    'type': unit_data['type']
+                }
+                break
 
     return JsonResponse(v_return)
 
@@ -389,6 +478,11 @@ def delete_monitor_unit(request):
         v_session.v_omnidb_database.v_connection.Execute('''
                 delete from mon_units
                 where unit_id = {0}
+            '''.format(v_unit_id))
+        v_session.v_omnidb_database.v_connection.Execute('''
+                delete from units_users_connections
+                where unit_id = {0}
+                  and plugin_name = ''
             '''.format(v_unit_id))
 
 
@@ -490,16 +584,20 @@ def refresh_monitor_units(request):
         v_database_orig.v_db_type,
         v_database_orig.v_connection.v_host,
         str(v_database_orig.v_connection.v_port),
-        v_database_orig.v_service,
-        v_database_orig.v_user,
+        v_database_orig.v_active_service,
+        v_database_orig.v_active_user,
         v_database_orig.v_connection.v_password,
         v_database_orig.v_conn_id,
-        v_database_orig.v_alias
+        v_database_orig.v_alias,
+        p_conn_string = v_database_orig.v_conn_string,
+        p_parse_conn_string = False
     )
+    v_return['v_data'] = []
 
     if len(v_ids) > 0:
         v_first = True
         v_query = ''
+        unit_counter = 0
         for v_id in v_ids:
 
             #save new user/connection unit
@@ -513,8 +611,9 @@ def refresh_monitor_units(request):
                             {0},
                             {1},
                             {2},
-                            {3});
-                    '''.format(v_id['id'],v_session.v_user_id,v_database_orig.v_conn_id,v_id['interval']));
+                            {3},
+                            '{4}');
+                    '''.format(v_id['id'],v_session.v_user_id,v_database_orig.v_conn_id,v_id['interval'],v_id['plugin_name']));
                     v_id['saved_id'] =  v_session.v_omnidb_database.v_connection.ExecuteScalar('''
                     select coalesce(max(uuc_id), 0) from units_users_connections
                     ''')
@@ -525,75 +624,150 @@ def refresh_monitor_units(request):
                     v_return['v_error'] = True
                     return JsonResponse(v_return)
 
-            if not v_first:
-                v_query += ' union all '
-            v_first = False
-            v_query += '''
-                select unit_id, {0} as 'sequence', {1} as rendered, {2} as saved_id, script_chart, script_data, type, title, interval
-                from mon_units where unit_id = '{3}'
-            '''.format(v_id['sequence'], v_id['rendered'], v_id['saved_id'], v_id['id'])
+            if v_id['plugin_name']=='':
+                if not v_first:
+                    v_query += ' union all '
+                v_first = False
+                v_query += '''
+                    select unit_id, {0} as 'sequence', {1} as rendered, {2} as saved_id, script_chart, script_data, type, title, interval, {3} as unit_counter
+                    from mon_units where unit_id = '{4}'
+                '''.format(v_id['sequence'], v_id['rendered'], v_id['saved_id'], unit_counter, v_id['id'])
 
-    v_return['v_data'] = []
+            #plugin unit
+            else:
+                #search plugin data
+                unit_data = None
+                for mon_unit in monitoring_units:
+                    if mon_unit['id'] == v_id['id'] and mon_unit['plugin_name'] == v_id['plugin_name']:
+                        unit_data = mon_unit
+                        break
 
-    try:
-        v_units = v_session.v_omnidb_database.v_connection.Query(v_query)
-        for v_unit in v_units.Rows:
+                try:
+                    v_unit_data = {
+                        'v_saved_id': v_id['saved_id'],
+                        'v_id': unit_data['id'],
+                        'v_sequence': v_id['sequence'],
+                        'v_type': unit_data['type'],
+                        'v_title': unit_data['title'],
+                        'v_interval': unit_data['interval'],
+                        'v_object': None,
+                        'v_error': False
+                    }
 
-            try:
-                v_unit_data = {
-                    'v_saved_id': v_unit['saved_id'],
-                    'v_id': v_unit['unit_id'],
-                    'v_sequence': v_unit['sequence'],
-                    'v_type': v_unit['type'],
-                    'v_title': v_unit['title'],
-                    'v_interval': v_unit['interval'],
-                    'v_object': None,
-                    'v_error': False
-                }
+                    loc = {
+                        "connection": v_database.v_connection,
+                        "previous_data": v_ids[unit_counter]['object_data']
+                    }
 
-                loc = {"connection": v_database.v_connection}
+                    builtins = safe_builtins.copy()
+                    builtins['_getiter_'] = iter
+                    builtins['_getitem_'] = default_guarded_getitem
 
-                builtins = safe_builtins.copy()
-                builtins['_getiter_'] = iter
-                builtins['_getitem_'] = default_guarded_getitem
-
-                byte_code = compile_restricted(v_unit['script_data'], '<inline>', 'exec')
-                exec(byte_code, builtins, loc)
-                data = loc['result']
-
-                if v_unit['type']  == 'grid' or v_unit['rendered'] == 1:
-                    v_unit_data['v_object'] = data
-                else:
-                    byte_code = compile_restricted(v_unit['script_chart'], '<inline>', 'exec')
+                    byte_code = compile_restricted(unit_data['script_data'], '<inline>', 'exec')
                     exec(byte_code, builtins, loc)
-                    result = loc['result']
-                    result['data'] = data
-                    v_unit_data['v_object'] = result
+                    data = loc['result']
+
+                    if unit_data['type']  == 'grid' or v_id['rendered'] == 1:
+                        v_unit_data['v_object'] = data
+                    elif unit_data['type'] == 'graph':
+                        byte_code = compile_restricted(unit_data['script_chart'], '<inline>', 'exec')
+                        exec(byte_code, builtins, loc)
+                        result = loc['result']
+                        result['elements'] = data
+                        v_unit_data['v_object'] = result
+                    else:
+                        byte_code = compile_restricted(unit_data['script_chart'], '<inline>', 'exec')
+                        exec(byte_code, builtins, loc)
+                        result = loc['result']
+                        result['data'] = data
+                        v_unit_data['v_object'] = result
 
 
-                v_return['v_data'].append(v_unit_data)
+                    v_return['v_data'].append(v_unit_data)
+                except Exception as exc:
+                    v_unit_data = {
+                        'v_saved_id': v_id['saved_id'],
+                        'v_id': unit_data['id'],
+                        'v_sequence': v_id['sequence'],
+                        'v_type': unit_data['type'],
+                        'v_title': unit_data['title'],
+                        'v_interval': unit_data['interval'],
+                        'v_object': None,
+                        'v_error': True,
+                        'v_message': str(exc)
+                    }
+                    v_return['v_data'].append(v_unit_data)
+
+            unit_counter = unit_counter + 1
+        if v_query != '':
+            try:
+                v_units = v_session.v_omnidb_database.v_connection.Query(v_query)
+                for v_unit in v_units.Rows:
+
+                    try:
+                        v_unit_data = {
+                            'v_saved_id': v_unit['saved_id'],
+                            'v_id': v_unit['unit_id'],
+                            'v_sequence': v_unit['sequence'],
+                            'v_type': v_unit['type'],
+                            'v_title': v_unit['title'],
+                            'v_interval': v_unit['interval'],
+                            'v_object': None,
+                            'v_error': False
+                        }
+
+                        loc = {
+                            "connection": v_database.v_connection,
+                            "previous_data": v_ids[v_unit['unit_counter']]['object_data']
+                        }
+
+                        builtins = safe_builtins.copy()
+                        builtins['_getiter_'] = iter
+                        builtins['_getitem_'] = default_guarded_getitem
+
+                        byte_code = compile_restricted(v_unit['script_data'], '<inline>', 'exec')
+                        exec(byte_code, builtins, loc)
+                        data = loc['result']
+
+                        if v_unit['type']  == 'grid' or v_unit['rendered'] == 1:
+                            v_unit_data['v_object'] = data
+                        elif v_unit['type'] == 'graph':
+                            byte_code = compile_restricted(v_unit['script_chart'], '<inline>', 'exec')
+                            exec(byte_code, builtins, loc)
+                            result = loc['result']
+                            result['elements'] = data
+                            v_unit_data['v_object'] = result
+                        else:
+                            byte_code = compile_restricted(v_unit['script_chart'], '<inline>', 'exec')
+                            exec(byte_code, builtins, loc)
+                            result = loc['result']
+                            result['data'] = data
+                            v_unit_data['v_object'] = result
+
+
+                        v_return['v_data'].append(v_unit_data)
+                    except Exception as exc:
+                        v_unit_data = {
+                            'v_saved_id': v_unit['saved_id'],
+                            'v_id': v_unit['unit_id'],
+                            'v_sequence': v_unit['sequence'],
+                            'v_type': v_unit['type'],
+                            'v_title': v_unit['title'],
+                            'v_interval': v_unit['interval'],
+                            'v_object': None,
+                            'v_error': True,
+                            'v_message': str(exc)
+                        }
+                        v_return['v_data'].append(v_unit_data)
+
+
+
             except Exception as exc:
-                v_unit_data = {
-                    'v_saved_id': v_unit['saved_id'],
-                    'v_id': v_unit['unit_id'],
-                    'v_sequence': v_unit['sequence'],
-                    'v_type': v_unit['type'],
-                    'v_title': v_unit['title'],
-                    'v_interval': v_unit['interval'],
-                    'v_object': None,
-                    'v_error': True,
-                    'v_message': str(exc)
-                }
-                v_return['v_data'].append(v_unit_data)
+                v_return['v_data'] = str(exc)
+                v_return['v_error'] = True
+                return JsonResponse(v_return)
 
-
-
-    except Exception as exc:
-        v_return['v_data'] = str(exc)
-        v_return['v_error'] = True
         return JsonResponse(v_return)
-
-    return JsonResponse(v_return)
 
 def test_monitor_script(request):
 
@@ -632,7 +806,10 @@ def test_monitor_script(request):
     }
 
     try:
-        loc = {"connection": v_database.v_connection}
+        loc = {
+            "connection": v_database.v_connection,
+            "previous_data": None
+        }
 
         builtins = safe_builtins.copy()
         builtins['_getiter_'] = iter
@@ -644,6 +821,12 @@ def test_monitor_script(request):
 
         if v_type == 'grid':
             v_return['v_data']['v_object'] = data
+        elif v_type =='graph':
+            byte_code = compile_restricted(v_script_chart, '<inline>', 'exec')
+            exec(byte_code, builtins, loc)
+            result = loc['result']
+            result['elements'] = data
+            v_return['v_data']['v_object'] = result
         else:
             byte_code = compile_restricted(v_script_chart, '<inline>', 'exec')
             exec(byte_code, builtins, loc)

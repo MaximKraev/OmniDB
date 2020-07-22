@@ -1,46 +1,27 @@
 /*
-Copyright 2015-2017 The OmniDB Team
+The MIT License (MIT)
 
-This file is part of OmniDB.
+Portions Copyright (c) 2015-2019, The OmniDB Team
+Portions Copyright (c) 2017-2019, 2ndQuadrant Limited
 
-OmniDB is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-OmniDB is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-You should have received a copy of the GNU General Public License along with OmniDB. If not, see http://www.gnu.org/licenses/.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 */
-
-function tabSQLTemplate(p_tab_name, p_template, p_showQtip=true) {
-    v_connTabControl.tag.createQueryTab(p_tab_name);
-    v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.editor.setValue(
-        p_template);
-    v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.editor.clearSelection();
-    v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.editor.gotoLine(
-        0, 0, true);
-    v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.sel_filtered_data
-        .value = 1;
-
-    if(p_showQtip) {
-        var qtip = $(v_connTabControl.selectedTab.tag.tabControl.selectedLi).qtip({
-            content: {
-                text: 'Adjust command and run!'
-            },
-            position: {
-                my: 'bottom center',
-                at: 'top center'
-            },
-            style: {
-                classes: 'qtip-bootstrap'
-            },
-            show: {
-                ready: true
-            }
-        })
-        window.setTimeout(function() {
-            qtip.qtip('api').destroy();
-        }, 4000);
-    }
-}
 
 /// <summary>
 /// Retrieving tree.
@@ -51,7 +32,7 @@ function getTreeMariadb(p_div) {
         'cm_server': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -65,7 +46,7 @@ function getTreeMariadb(p_div) {
         'cm_databases': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -76,19 +57,19 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Create Database',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Create Database', node.tree
                         .tag.create_database);
                 }
             }/*, {
                 text: 'Doc: Databases',
-                icon: '/static/OmniDB_app/images/globe.png',
+                icon: 'fas cm-all fa-globe-americas',
                 action: function(node) {
                     v_connTabControl.tag.createWebsiteTab(
                         'Documentation: Databases',
                         'https://www.postgresql.org/docs/' +
-                        getMajorVersion(node.tree.tag.version) +
+                        getMajorVersionMariadb(node.tree.tag.version) +
                         '/static/managing-databases.html');
                 }
             }*/]
@@ -97,14 +78,14 @@ function getTreeMariadb(p_div) {
             elements: [
               {
                   text: 'Render Graph',
-                  icon: '/static/OmniDB_app/images/graph.png',
+                  icon: 'fab cm-all fa-hubspot',
                   action: function(node) {
 
                   },
                   submenu: {
                       elements: [{
                           text: 'Simple Graph',
-                          icon: '/static/OmniDB_app/images/graph.png',
+                          icon: 'fab cm-all fa-hubspot',
                           action: function(node) {
                               v_connTabControl.tag.createGraphTab(
                                   node.text)
@@ -112,7 +93,7 @@ function getTreeMariadb(p_div) {
                           }
                       }, {
                           text: 'Complete Graph',
-                          icon: '/static/OmniDB_app/images/graph.png',
+                          icon: 'fab cm-all fa-hubspot',
                           action: function(node) {
                               v_connTabControl.tag.createGraphTab(
                                   node.text)
@@ -123,7 +104,7 @@ function getTreeMariadb(p_div) {
               },
               {
                   text: 'Alter Database',
-                  icon: '/static/OmniDB_app/images/text_edit.png',
+                  icon: 'fas cm-all fa-edit',
                   action: function(node) {
                       tabSQLTemplate('Alter Database', node.tree.tag
                           .alter_database.replace(
@@ -131,7 +112,7 @@ function getTreeMariadb(p_div) {
                   }
               }, {
                   text: 'Drop Database',
-                  icon: '/static/OmniDB_app/images/tab_close.png',
+                  icon: 'fas cm-all fa-times',
                   action: function(node) {
                       tabSQLTemplate('Drop Database', node.tree.tag
                           .drop_database.replace(
@@ -143,7 +124,7 @@ function getTreeMariadb(p_div) {
         'cm_roles': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -154,19 +135,19 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Create Role',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Create Role', node.tree.tag
                         .create_role);
                 }
             }/*, {
                 text: 'Doc: Roles',
-                icon: '/static/OmniDB_app/images/globe.png',
+                icon: 'fas cm-all fa-globe-americas',
                 action: function(node) {
                     v_connTabControl.tag.createWebsiteTab(
                         'Documentation: Roles',
                         'https://www.postgresql.org/docs/' +
-                        getMajorVersion(node.tree.tag.version) +
+                        getMajorVersionMariadb(node.tree.tag.version) +
                         '/static/user-manag.html');
                 }
             }*/]
@@ -174,14 +155,14 @@ function getTreeMariadb(p_div) {
         'cm_role': {
             elements: [{
                 text: 'Alter Role',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Alter Role', node.tree.tag.alter_role
                         .replace('#role_name#', node.text));
                 }
             }, {
                 text: 'Drop Role',
-                icon: '/static/OmniDB_app/images/tab_close.png',
+                icon: 'fas cm-all fa-times',
                 action: function(node) {
                     tabSQLTemplate('Drop Role', node.tree.tag.drop_role
                         .replace('#role_name#', node.text));
@@ -191,7 +172,7 @@ function getTreeMariadb(p_div) {
         'cm_tables': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -202,13 +183,13 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Create Table (GUI)',
-                icon: '/static/OmniDB_app/images/new_table.png',
+                icon: 'fas cm-all fa-plus-square',
                 action: function(node) {
                     startAlterTable(true, 'new', null, node.parent.text);
                 }
             }, {
                 text: 'Create Table (SQL)',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Create Table', node.tree.tag
                         .create_table.replace(
@@ -216,32 +197,32 @@ function getTreeMariadb(p_div) {
                 }
             }/*, {
                 text: 'Doc: Basics',
-                icon: '/static/OmniDB_app/images/globe.png',
+                icon: 'fas cm-all fa-globe-americas',
                 action: function(node) {
                     v_connTabControl.tag.createWebsiteTab(
                         'Documentation: Table Basics',
                         'https://www.postgresql.org/docs/' +
-                        getMajorVersion(node.tree.tag.version) +
+                        getMajorVersionMariadb(node.tree.tag.version) +
                         '/static/ddl-basics.html');
                 }
             }, {
                 text: 'Doc: Constraints',
-                icon: '/static/OmniDB_app/images/globe.png',
+                icon: 'fas cm-all fa-globe-americas',
                 action: function(node) {
                     v_connTabControl.tag.createWebsiteTab(
                         'Documentation: Table Constraints',
                         'https://www.postgresql.org/docs/' +
-                        getMajorVersion(node.tree.tag.version) +
+                        getMajorVersionMariadb(node.tree.tag.version) +
                         '/static/ddl-constraints.html');
                 }
             }, {
                 text: 'Doc: Modifying',
-                icon: '/static/OmniDB_app/images/globe.png',
+                icon: 'fas cm-all fa-globe-americas',
                 action: function(node) {
                     v_connTabControl.tag.createWebsiteTab(
                         'Documentation: Modifying Tables',
                         'https://www.postgresql.org/docs/' +
-                        getMajorVersion(node.tree.tag.version) +
+                        getMajorVersionMariadb(node.tree.tag.version) +
                         '/static/ddl-alter.html');
                 }
             }*/]
@@ -249,7 +230,7 @@ function getTreeMariadb(p_div) {
         'cm_table': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -260,18 +241,18 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Data Actions',
-                icon: '/static/OmniDB_app/images/list.png',
+                icon: 'fas cm-all fa-list',
                 submenu: {
                     elements: [{
                         text: 'Query Data',
-                        icon: '/static/OmniDB_app/images/query.png',
+                        icon: 'fas cm-all fa-search',
                         action: function(node) {
                             TemplateSelectMariadb(node.parent
                               .parent.text, node.text);
                         }
                     }, {
                         text: 'Edit Data',
-                        icon: '/static/OmniDB_app/images/edit_data.png',
+                        icon: 'fas cm-all fa-table',
                         action: function(node) {
                             startEditData(node.text,
                                 node.parent.parent.text
@@ -279,21 +260,21 @@ function getTreeMariadb(p_div) {
                         }
                     }, {
                         text: 'Insert Record',
-                        icon: '/static/OmniDB_app/images/insert.png',
+                        icon: 'fas cm-all fa-edit',
                         action: function(node) {
                             TemplateInsertMariadb(node.parent
                               .parent.text, node.text);
                         }
                     }, {
                         text: 'Update Records',
-                        icon: '/static/OmniDB_app/images/update.png',
+                        icon: 'fas cm-all fa-edit',
                         action: function(node) {
                             TemplateUpdateMariadb(node.parent
                               .parent.text, node.text);
                         }
                     }, {
                         text: 'Count Records',
-                        icon: '/static/OmniDB_app/images/counter.png',
+                        icon: 'fas cm-all fa-sort-numeric-down',
                         action: function(node) {
 
                             var v_table_name = '';
@@ -320,7 +301,7 @@ function getTreeMariadb(p_div) {
                         }
                     }, {
                         text: 'Delete Records',
-                        icon: '/static/OmniDB_app/images/tab_close.png',
+                        icon: 'fas cm-all fa-times',
                         action: function(node) {
                           tabSQLTemplate(
                               'Delete Records',
@@ -335,11 +316,11 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Table Actions',
-                icon: '/static/OmniDB_app/images/list.png',
+                icon: 'fas cm-all fa-list',
                 submenu: {
                     elements: [{
                         text: 'Alter Table',
-                        icon: '/static/OmniDB_app/images/table_edit.png',
+                        icon: 'fas cm-all fa-table',
                         action: function(node) {
                             startAlterTable(true,
                                 'alter', node.text,
@@ -348,7 +329,7 @@ function getTreeMariadb(p_div) {
                         }
                     }, {
                         text: 'Alter Table (SQL)',
-                        icon: '/static/OmniDB_app/images/text_edit.png',
+                        icon: 'fas cm-all fa-edit',
                         action: function(node) {
                             tabSQLTemplate('Alter Table', node.tree.tag
                                 .alter_table.replace(
@@ -357,7 +338,7 @@ function getTreeMariadb(p_div) {
                         }
                     }, {
                         text: 'Drop Table',
-                        icon: '/static/OmniDB_app/images/tab_close.png',
+                        icon: 'fas cm-all fa-times',
                         action: function(node) {
                             tabSQLTemplate('Drop Table',
                                 node.tree.tag.drop_table
@@ -372,7 +353,7 @@ function getTreeMariadb(p_div) {
         'cm_columns': {
             elements: [{
                 text: 'Create Column',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Create Field', node.tree.tag
                         .create_column.replace(
@@ -384,7 +365,7 @@ function getTreeMariadb(p_div) {
         'cm_column': {
             elements: [{
                 text: 'Alter Column',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Alter Column', node.tree.tag
                         .alter_column.replace(
@@ -394,7 +375,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Drop Column',
-                icon: '/static/OmniDB_app/images/tab_close.png',
+                icon: 'fas cm-all fa-times',
                 action: function(node) {
                     tabSQLTemplate('Drop Column', node.tree.tag
                         .drop_column.replace('#table_name#',
@@ -407,7 +388,7 @@ function getTreeMariadb(p_div) {
         'cm_pks': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -418,7 +399,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Create Primary Key',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Create Primary Key', node.tree
                         .tag.create_primarykey.replace(
@@ -430,7 +411,7 @@ function getTreeMariadb(p_div) {
         'cm_pk': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -441,7 +422,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Drop Primary Key',
-                icon: '/static/OmniDB_app/images/tab_close.png',
+                icon: 'fas cm-all fa-times',
                 action: function(node) {
                     tabSQLTemplate('Drop Primary Key', node.tree
                         .tag.drop_primarykey.replace(
@@ -455,7 +436,7 @@ function getTreeMariadb(p_div) {
         'cm_fks': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -466,7 +447,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Create Foreign Key',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Create Foreign Key', node.tree
                         .tag.create_foreignkey.replace(
@@ -478,7 +459,7 @@ function getTreeMariadb(p_div) {
         'cm_fk': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -489,7 +470,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Drop Foreign Key',
-                icon: '/static/OmniDB_app/images/tab_close.png',
+                icon: 'fas cm-all fa-times',
                 action: function(node) {
                     tabSQLTemplate('Drop Foreign Key', node.tree
                         .tag.drop_foreignkey.replace(
@@ -503,7 +484,7 @@ function getTreeMariadb(p_div) {
         'cm_uniques': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -514,7 +495,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Create Unique',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Create Unique', node.tree.tag
                         .create_unique.replace(
@@ -526,7 +507,7 @@ function getTreeMariadb(p_div) {
         'cm_unique': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -537,7 +518,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Drop Unique',
-                icon: '/static/OmniDB_app/images/tab_close.png',
+                icon: 'fas cm-all fa-times',
                 action: function(node) {
                     tabSQLTemplate('Drop Unique', node.tree.tag
                         .drop_unique.replace('#table_name#',
@@ -551,7 +532,7 @@ function getTreeMariadb(p_div) {
         'cm_indexes': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -562,7 +543,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Create Index',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Create Index', node.tree.tag
                         .create_index.replace(
@@ -571,12 +552,12 @@ function getTreeMariadb(p_div) {
                 }
             }/*, {
                 text: 'Doc: Indexes',
-                icon: '/static/OmniDB_app/images/globe.png',
+                icon: 'fas cm-all fa-globe-americas',
                 action: function(node) {
                     v_connTabControl.tag.createWebsiteTab(
                         'Documentation: Indexes',
                         'https://www.postgresql.org/docs/' +
-                        getMajorVersion(node.tree.tag.version) +
+                        getMajorVersionMariadb(node.tree.tag.version) +
                         '/static/indexes.html');
                 }
             }*/]
@@ -584,7 +565,7 @@ function getTreeMariadb(p_div) {
         'cm_index': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -595,7 +576,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Drop Index',
-                icon: '/static/OmniDB_app/images/tab_close.png',
+                icon: 'fas cm-all fa-times',
                 action: function(node) {
                     tabSQLTemplate('Drop Index', node.tree.tag.drop_index
                         .replace('#index_name#', node.parent.parent.parent.parent.text + '.' + node.text.replace(
@@ -604,10 +585,62 @@ function getTreeMariadb(p_div) {
                 }
             }]
         },
+        'cm_sequences': {
+            elements: [{
+                text: 'Refresh',
+                icon: 'fas cm-all fa-sync-alt',
+                action: function(node) {
+                    if (node.childNodes == 0)
+                        refreshTreeOracle(node);
+                    else {
+                        node.collapseNode();
+                        node.expandNode();
+                    }
+                }
+            }, {
+                text: 'Create Sequence',
+                icon: 'fas cm-all fa-edit',
+                action: function(node) {
+                    tabSQLTemplate('Create Sequence', node.tree
+                        .tag.create_sequence.replace(
+                            '#schema_name#', node.parent.text
+                        ));
+                }
+            }/*, {
+                text: 'Doc: Sequences',
+                icon: 'fas cm-all fa-globe-americas',
+                action: function(node) {
+                    v_connTabControl.tag.createWebsiteTab(
+                        'Documentation: Sequences',
+                        'https://www.postgresql.org/docs/' +
+                        getMajorVersionMariadb(node.tree.tag.version) +
+                        '/static/sql-createsequence.html');
+                }
+            }*/]
+        },
+        'cm_sequence': {
+            elements: [{
+                text: 'Alter Sequence',
+                icon: 'fas cm-all fa-edit',
+                action: function(node) {
+                    tabSQLTemplate('Alter Sequence', node.tree.tag
+                        .alter_sequence.replace(
+                            '#sequence_name#', node.parent.parent.text + '.' + node.text));
+                }
+            }, {
+                text: 'Drop Sequence',
+                icon: 'fas cm-all fa-times',
+                action: function(node) {
+                    tabSQLTemplate('Drop Sequence', node.tree.tag
+                        .drop_sequence.replace(
+                            '#sequence_name#', node.parent.parent.text + '.' + node.text));
+                }
+            }]
+        },
         'cm_views': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -618,7 +651,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Create View',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Create View', node.tree.tag
                         .create_view.replace(
@@ -627,12 +660,12 @@ function getTreeMariadb(p_div) {
                 }
             }/*, {
                 text: 'Doc: Views',
-                icon: '/static/OmniDB_app/images/globe.png',
+                icon: 'fas cm-all fa-globe-americas',
                 action: function(node) {
                     v_connTabControl.tag.createWebsiteTab(
                         'Documentation: Views',
                         'https://www.postgresql.org/docs/' +
-                        getMajorVersion(node.tree.tag.version) +
+                        getMajorVersionMariadb(node.tree.tag.version) +
                         '/static/sql-createview.html');
                 }
             }*/]
@@ -640,7 +673,7 @@ function getTreeMariadb(p_div) {
         'cm_view': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -651,7 +684,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Query Data',
-                icon: '/static/OmniDB_app/images/query.png',
+                icon: 'fas cm-all fa-search',
                 action: function(node) {
 
                     var v_table_name = '';
@@ -659,10 +692,6 @@ function getTreeMariadb(p_div) {
 
                     v_connTabControl.tag.createQueryTab(
                         node.text);
-
-                    v_connTabControl.selectedTab.tag.tabControl
-                        .selectedTab.tag.sel_filtered_data.value =
-                        1;
 
                     v_connTabControl.selectedTab.tag.tabControl
                         .selectedTab.tag.editor.setValue(
@@ -680,7 +709,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Edit View',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     v_connTabControl.tag.createQueryTab(
                         node.text);
@@ -688,7 +717,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Drop View',
-                icon: '/static/OmniDB_app/images/tab_close.png',
+                icon: 'fas cm-all fa-times',
                 action: function(node) {
                     tabSQLTemplate('Drop View', node.tree.tag.drop_view
                         .replace('#view_name#', node.parent.parent.text + '.' + node.text)
@@ -699,7 +728,7 @@ function getTreeMariadb(p_div) {
         /*'cm_triggers': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -710,7 +739,7 @@ function getTreeMariadb(p_div) {
                 },
             }, {
                 text: 'Create Trigger',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Create Trigger', node.tree.tag
                         .create_trigger.replace(
@@ -719,12 +748,12 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Doc: Triggers',
-                icon: '/static/OmniDB_app/images/globe.png',
+                icon: 'fas cm-all fa-globe-americas',
                 action: function(node) {
                     v_connTabControl.tag.createWebsiteTab(
                         'Documentation: Triggers',
                         'https://www.postgresql.org/docs/' +
-                        getMajorVersion(node.tree.tag.version) +
+                        getMajorVersionMariadb(node.tree.tag.version) +
                         '/static/trigger-definition.html');
                 }
             }]
@@ -732,7 +761,7 @@ function getTreeMariadb(p_div) {
         'cm_view_triggers': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -743,7 +772,7 @@ function getTreeMariadb(p_div) {
                 },
             }, {
                 text: 'Create Trigger',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Create Trigger', node.tree.tag
                         .create_view_trigger.replace(
@@ -752,12 +781,12 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Doc: Triggers',
-                icon: '/static/OmniDB_app/images/globe.png',
+                icon: 'fas cm-all fa-globe-americas',
                 action: function(node) {
                     v_connTabControl.tag.createWebsiteTab(
                         'Documentation: Triggers',
                         'https://www.postgresql.org/docs/' +
-                        getMajorVersion(node.tree.tag.version) +
+                        getMajorVersionMariadb(node.tree.tag.version) +
                         '/static/trigger-definition.html');
                 }
             }]
@@ -765,7 +794,7 @@ function getTreeMariadb(p_div) {
         'cm_trigger': {
             elements: [{
                 text: 'Alter Trigger',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Alter Trigger', node.tree.tag
                         .alter_trigger.replace(
@@ -775,7 +804,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Enable Trigger',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Enable Trigger', node.tree.tag
                         .enable_trigger.replace(
@@ -785,7 +814,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Disable Trigger',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Disable Trigger', node.tree
                         .tag.disable_trigger.replace(
@@ -795,7 +824,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Drop Trigger',
-                icon: '/static/OmniDB_app/images/tab_close.png',
+                icon: 'fas cm-all fa-times',
                 action: function(node) {
                     tabSQLTemplate('Drop Trigger', node.tree.tag
                         .drop_trigger.replace(
@@ -808,7 +837,7 @@ function getTreeMariadb(p_div) {
         'cm_partitions': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -819,7 +848,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Create Partition',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Create Partition', node.tree
                         .tag.create_partition.replace(
@@ -828,12 +857,12 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Doc: Partitions',
-                icon: '/static/OmniDB_app/images/globe.png',
+                icon: 'fas cm-all fa-globe-americas',
                 action: function(node) {
                     v_connTabControl.tag.createWebsiteTab(
                         'Documentation: Partitions',
                         'https://www.postgresql.org/docs/' +
-                        getMajorVersion(node.tree.tag.version) +
+                        getMajorVersionMariadb(node.tree.tag.version) +
                         '/static/ddl-partitioning.html');
                 }
             }]
@@ -841,7 +870,7 @@ function getTreeMariadb(p_div) {
         'cm_partition': {
             elements: [{
                 text: 'No Inherit Partition',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('No Inherit Partition', node
                         .tree.tag.noinherit_partition.replace(
@@ -851,7 +880,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Drop Partition',
-                icon: '/static/OmniDB_app/images/tab_close.png',
+                icon: 'fas cm-all fa-times',
                 action: function(node) {
                     tabSQLTemplate('Drop Partition', node.tree.tag
                         .drop_partition.replace(
@@ -862,7 +891,7 @@ function getTreeMariadb(p_div) {
         'cm_functions': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -873,7 +902,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Create Function',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Create Function', node.tree
                         .tag.create_function.replace(
@@ -882,12 +911,12 @@ function getTreeMariadb(p_div) {
                 }
             }/*, {
                 text: 'Doc: Functions',
-                icon: '/static/OmniDB_app/images/globe.png',
+                icon: 'fas cm-all fa-globe-americas',
                 action: function(node) {
                     v_connTabControl.tag.createWebsiteTab(
                         'Documentation: Functions',
                         'https://www.postgresql.org/docs/' +
-                        getMajorVersion(node.tree.tag.version) +
+                        getMajorVersionMariadb(node.tree.tag.version) +
                         '/static/sql-createfunction.html');
                 }
             }*/]
@@ -895,7 +924,7 @@ function getTreeMariadb(p_div) {
         'cm_function': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -906,24 +935,15 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Edit Function',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     v_connTabControl.tag.createQueryTab(
                         node.text);
                     getFunctionDefinitionMariadb(node);
                 }
-            }/*, {
-                text: 'Debug Function',
-                icon: '/static/OmniDB_app/images/debug.png',
-                action: function(node) {
-                    v_connTabControl.tag.createDebuggerTab(
-                        node.text);
-                    getDebugFunctionDefinitionMariadb(node);
-                    setupDebug(node);
-                }
-            }*/, {
+            }, {
                 text: 'Drop Function',
-                icon: '/static/OmniDB_app/images/tab_close.png',
+                icon: 'fas cm-all fa-times',
                 action: function(node) {
                     tabSQLTemplate('Drop Function', node.tree.tag
                         .drop_function.replace(
@@ -935,7 +955,7 @@ function getTreeMariadb(p_div) {
         'cm_procedures': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -946,7 +966,7 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Create Procedure',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     tabSQLTemplate('Create Procedure', node.tree
                         .tag.create_procedure.replace(
@@ -955,12 +975,12 @@ function getTreeMariadb(p_div) {
                 }
             }/*, {
                 text: 'Doc: Procedures',
-                icon: '/static/OmniDB_app/images/globe.png',
+                icon: 'fas cm-all fa-globe-americas',
                 action: function(node) {
                     v_connTabControl.tag.createWebsiteTab(
                         'Documentation: Functions',
                         'https://www.postgresql.org/docs/' +
-                        getMajorVersion(node.tree.tag.version) +
+                        getMajorVersionMariadb(node.tree.tag.version) +
                         '/static/sql-createfunction.html');
                 }
             }*/]
@@ -968,7 +988,7 @@ function getTreeMariadb(p_div) {
         'cm_procedure': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -979,24 +999,15 @@ function getTreeMariadb(p_div) {
                 }
             }, {
                 text: 'Edit Procedure',
-                icon: '/static/OmniDB_app/images/text_edit.png',
+                icon: 'fas cm-all fa-edit',
                 action: function(node) {
                     v_connTabControl.tag.createQueryTab(
                         node.text);
                     getProcedureDefinitionMariadb(node);
                 }
-            }/*, {
-                text: 'Debug Procedure',
-                icon: '/static/OmniDB_app/images/debug.png',
-                action: function(node) {
-                    v_connTabControl.tag.createDebuggerTab(
-                        node.text);
-                    getDebugProcedureDefinitionMariadb(node);
-                    setupDebug(node);
-                }
-            }*/, {
+            }, {
                 text: 'Drop Procedure',
-                icon: '/static/OmniDB_app/images/tab_close.png',
+                icon: 'fas cm-all fa-times',
                 action: function(node) {
                     tabSQLTemplate('Drop Procedure', node.tree.tag
                         .drop_procedure.replace(
@@ -1005,73 +1016,10 @@ function getTreeMariadb(p_div) {
                 }
             }]
         },
-        /*'cm_triggerfunctions': {
-            elements: [{
-                text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
-                action: function(node) {
-                    if (node.childNodes == 0)
-                        refreshTreeMariadb(node);
-                    else {
-                        node.collapseNode();
-                        node.expandNode();
-                    }
-                }
-            }, {
-                text: 'Create Trigger Function',
-                icon: '/static/OmniDB_app/images/text_edit.png',
-                action: function(node) {
-                    tabSQLTemplate('Create Trigger Function',
-                        node.tree.tag.create_triggerfunction
-                        .replace('#schema_name#', node.tree.tag.v_database));
-                }
-            }, {
-                text: 'Doc: Trigger Functions',
-                icon: '/static/OmniDB_app/images/globe.png',
-                action: function(node) {
-                    v_connTabControl.tag.createWebsiteTab(
-                        'Documentation: Trigger Functions',
-                        'https://www.postgresql.org/docs/' +
-                        getMajorVersion(node.tree.tag.version) +
-                        '/static/plpgsql-trigger.html');
-                }
-            }]
-        },
-        'cm_triggerfunction': {
-            elements: [{
-                text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
-                action: function(node) {
-                    if (node.childNodes == 0)
-                        refreshTreeMariadb(node);
-                    else {
-                        node.collapseNode();
-                        node.expandNode();
-                    }
-                }
-            }, {
-                text: 'Edit Trigger Function',
-                icon: '/static/OmniDB_app/images/text_edit.png',
-                action: function(node) {
-                    v_connTabControl.tag.createQueryTab(
-                        node.text);
-                    getTriggerFunctionDefinitionMariadb(node);
-                }
-            }, {
-                text: 'Drop Trigger Function',
-                icon: '/static/OmniDB_app/images/tab_close.png',
-                action: function(node) {
-                    tabSQLTemplate('Drop Trigger Function',
-                        node.tree.tag.drop_triggerfunction.replace(
-                            '#function_name#', node.tag.id)
-                    );
-                }
-            }]
-        },*/
         'cm_refresh': {
             elements: [{
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -1112,10 +1060,10 @@ function getTreeMariadb(p_div) {
     }
 
     var node_server = tree.createNode('MariaDB', false,
-        '/static/OmniDB_app/images/mariadb_medium.png', null, {
+        'node-mariadb', null, {
             type: 'server'
         }, 'cm_server');
-    node_server.createChildNode('', true, '/static/OmniDB_app/images/spin.svg',
+    node_server.createChildNode('', true, 'node-spin',
         null, null);
     tree.drawTree();
 
@@ -1129,6 +1077,14 @@ function getTreeMariadb(p_div) {
 function getPropertiesMariadb(node) {
     if (node.tag != undefined)
         if (node.tag.type == 'table') {
+        getProperties('/get_properties_mariadb/',
+          {
+            p_schema: node.parent.parent.text,
+            p_table: null,
+            p_object: node.text,
+            p_type: node.tag.type
+          });
+      } else if (node.tag.type == 'sequence') {
         getProperties('/get_properties_mariadb/',
           {
             p_schema: node.parent.parent.text,
@@ -1209,6 +1165,8 @@ function refreshTreeMariadb(node) {
         getProceduresMariadb(node);
     } else if (node.tag.type == 'procedure') {
         getProcedureFieldsMariadb(node);
+    } else if (node.tag.type == 'sequence_list') {
+        getSequencesMariadb(node);
     } else if (node.tag.type == 'database_list') {
         getDatabasesMariadb(node);
     } else if (node.tag.type == 'database') {
@@ -1244,7 +1202,7 @@ function afterNodeOpenedCallbackMariaDB(node) {
 function getTreeDetailsMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
     execAjax('/get_tree_info_mariadb/',
@@ -1257,7 +1215,7 @@ function getTreeDetailsMariadb(node) {
             node.tree.contextMenu.cm_server.elements = []
             node.tree.contextMenu.cm_server.elements.push({
                 text: 'Refresh',
-                icon: '/static/OmniDB_app/images/refresh.png',
+                icon: 'fas cm-all fa-sync-alt',
                 action: function(node) {
                     if (node.childNodes == 0)
                         refreshTreeMariadb(node);
@@ -1270,34 +1228,34 @@ function getTreeDetailsMariadb(node) {
 
             /*node.tree.contextMenu.cm_server.elements.push({
                 text: 'Doc: PostgreSQL',
-                icon: '/static/OmniDB_app/images/globe.png',
+                icon: 'fas cm-all fa-globe-americas',
                 action: function(node) {
                     v_connTabControl.tag.createWebsiteTab(
                         'Documentation: PostgreSQL',
                         'https://www.postgresql.org/docs/' +
-                        getMajorVersion(node.tree.tag.version) +
+                        getMajorVersionMariadb(node.tree.tag.version) +
                         '/static/');
                 }
             });
             node.tree.contextMenu.cm_server.elements.push({
                 text: 'Doc: SQL Language',
-                icon: '/static/OmniDB_app/images/globe.png',
+                icon: 'fas cm-all fa-globe-americas',
                 action: function(node) {
                     v_connTabControl.tag.createWebsiteTab(
                         'Documentation: SQL Language',
                         'https://www.postgresql.org/docs/' +
-                        getMajorVersion(node.tree.tag.version) +
+                        getMajorVersionMariadb(node.tree.tag.version) +
                         '/static/sql.html');
                 }
             });
             node.tree.contextMenu.cm_server.elements.push({
                 text: 'Doc: SQL Commands',
-                icon: '/static/OmniDB_app/images/globe.png',
+                icon: 'fas cm-all fa-globe-americas',
                 action: function(node) {
                     v_connTabControl.tag.createWebsiteTab(
                         'Documentation: SQL Commands',
                         'https://www.postgresql.org/docs/' +
-                        getMajorVersion(node.tree.tag.version) +
+                        getMajorVersionMariadb(node.tree.tag.version) +
                         '/static/sql-commands.html');
                 }
             });*/
@@ -1324,6 +1282,9 @@ function getTreeDetailsMariadb(node) {
                 //    .create_triggerfunction,
                 //drop_triggerfunction: p_return.v_data.v_database_return
                 //    .drop_triggerfunction,
+                create_sequence: p_return.v_data.v_database_return.create_sequence,
+                alter_sequence: p_return.v_data.v_database_return.alter_sequence,
+                drop_sequence: p_return.v_data.v_database_return.drop_sequence,
                 create_view: p_return.v_data.v_database_return.create_view,
                 drop_view: p_return.v_data.v_database_return.drop_view,
                 create_table: p_return.v_data.v_database_return.create_table,
@@ -1354,24 +1315,24 @@ function getTreeDetailsMariadb(node) {
 
             node.tree.contextMenu.cm_server.elements.push({
                 text: 'Monitoring',
-                icon: '/static/OmniDB_app/images/monitoring.png',
+                icon: 'fas cm-all fa-chart-line',
                 action: function(node) {},
                 submenu: {
                     elements: [/*{
                         text: 'Dashboard',
-                        icon: '/static/OmniDB_app/images/monitoring.png',
+                        icon: 'fas cm-all fa-chart-line',
                         action: function(node) {
                             v_connTabControl.tag.createMonitorDashboardTab();
                             startMonitorDashboard();
                         }
                     }, */{
                         text: 'Process List',
-                        icon: '/static/OmniDB_app/images/monitoring.png',
+                        icon: 'fas cm-all fa-chart-line',
                         action: function(node) {
                             v_connTabControl.tag.createMonitoringTab(
                                 'Process List',
                                 'select * from information_schema.processlist', [{
-                                    icon: '/static/OmniDB_app/images/tab_close.png',
+                                    icon: 'fas cm-all fa-times',
                                     title: 'Terminate',
                                     action: 'mariadbTerminateBackend'
                                 }]);
@@ -1383,21 +1344,21 @@ function getTreeDetailsMariadb(node) {
             node.setText(p_return.v_data.v_database_return.version);
 
             var node_databases = node.createChildNode('Databases', false,
-                '/static/OmniDB_app/images/db.png', {
+                'fas node-all fa-database node-database-list', {
                 type: 'database_list',
                 num_databases: 0
             }, 'cm_databases');
             node_databases.createChildNode('', true,
-                '/static/OmniDB_app/images/spin.svg', null, null);
+                'node-spin', null, null);
 
             if (node.tree.tag.superuser) {
                 var node_roles = node.createChildNode('Roles', false,
-                    '/static/OmniDB_app/images/role.png', {
+                    'fas node-all fa-users node-user-list', {
                         type: 'role_list',
                         num_roles: 0
                 }, 'cm_roles');
                 node_roles.createChildNode('', true,
-                    '/static/OmniDB_app/images/spin.svg', null, null);
+                    'node-spin', null, null);
             }
 
             if (v_connTabControl.selectedTab.tag.firstTimeOpen) {
@@ -1426,40 +1387,52 @@ function getDatabaseObjectsMariadb(node) {
     node.removeChildNodes();
 
     var node_tables = node.createChildNode('Tables', false,
-        '/static/OmniDB_app/images/table_multiple.png', {
+        'fas node-all fa-th node-table-list', {
             type: 'table_list',
             num_tables: 0,
             database: v_connTabControl.selectedTab.tag.selectedDatabase
         }, 'cm_tables');
     node_tables.createChildNode('', true,
-        '/static/OmniDB_app/images/spin.svg', null, null);
+        'node-spin', null, null);
+
+    if (parseFloat(getMajorVersionMariadb(node.tree.tag.version)) >= 10.3) {
+        var node_sequences = node.createChildNode('Sequences',
+            false,
+            'fas node-all fa-sort-numeric-down node-sequence-list', {
+                type: 'sequence_list',
+                num_sequences: 0,
+                database: v_connTabControl.selectedTab.tag.selectedDatabase
+            }, 'cm_sequences');
+        node_sequences.createChildNode('', true,
+            'node-spin', null, null);
+    }
 
     var node_views = node.createChildNode('Views', false,
-        '/static/OmniDB_app/images/view_multiple.png', {
+        'fas node-all fa-eye node-view-list', {
             type: 'view_list',
             num_views: 0,
             database: v_connTabControl.selectedTab.tag.selectedDatabase
         }, 'cm_views');
     node_views.createChildNode('', true,
-        '/static/OmniDB_app/images/spin.svg', null, null);
+        'node-spin', null, null);
 
     var node_functions = node.createChildNode('Functions',
-        false, '/static/OmniDB_app/images/gear2.png', {
+        false, 'fas node-all fa-cog node-function-list', {
             type: 'function_list',
             num_functions: 0,
             database: v_connTabControl.selectedTab.tag.selectedDatabase
         }, 'cm_functions');
     node_functions.createChildNode('', true,
-        '/static/OmniDB_app/images/spin.svg', null, null);
+        'node-spin', null, null);
 
     var node_functions = node.createChildNode('Procedures',
-        false, '/static/OmniDB_app/images/gear2.png', {
+        false, 'fas node-all fa-cog node-procedure-list', {
             type: 'procedure_list',
             num_functions: 0,
             database: v_connTabControl.selectedTab.tag.selectedDatabase
         }, 'cm_procedures');
     node_functions.createChildNode('', true,
-        '/static/OmniDB_app/images/spin.svg', null, null);
+        'node-spin', null, null);
 
     afterNodeOpenedCallbackMariaDB(node);
 }
@@ -1471,7 +1444,7 @@ function getDatabaseObjectsMariadb(node) {
 function getDatabasesMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
 
@@ -1492,7 +1465,7 @@ function getDatabasesMariadb(node) {
             for (i = 0; i < p_return.v_data.length; i++) {
 
                 var v_node = node.createChildNode(p_return.v_data[i].v_name,
-                    false, '/static/OmniDB_app/images/db.png', {
+                    false, 'fas node-all fa-database node-database', {
                         type: 'database',
                         database: p_return.v_data[i].v_name.replace(/"/g, '')
                     }, 'cm_database',null,false);
@@ -1503,7 +1476,7 @@ function getDatabasesMariadb(node) {
                 }
 
                 v_node.createChildNode('', true,
-                    '/static/OmniDB_app/images/spin.svg', null, null,null,false);
+                    'node-spin', null, null,null,false);
 
             }
 
@@ -1526,7 +1499,7 @@ function getDatabasesMariadb(node) {
 function getRolesMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
     execAjax('/get_roles_mariadb/',
@@ -1546,7 +1519,7 @@ function getRolesMariadb(node) {
             for (i = 0; i < p_return.v_data.length; i++) {
 
                 v_node = node.createChildNode(p_return.v_data[i].v_name,
-                    false, '/static/OmniDB_app/images/role.png', {
+                    false, 'fas node-all fa-user node-user', {
                         type: 'role',
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, 'cm_role',null,false);
@@ -1572,7 +1545,7 @@ function getRolesMariadb(node) {
 function getTablesMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
 
@@ -1594,7 +1567,7 @@ function getTablesMariadb(node) {
             for (i = 0; i < p_return.v_data.length; i++) {
 
                 v_node = node.createChildNode(p_return.v_data[i].v_name,
-                    false, '/static/OmniDB_app/images/table.png', {
+                    false, 'fas node-all fa-table node-table', {
                         type: 'table',
                         has_primary_keys: p_return.v_data[i].v_has_primary_keys,
                         has_foreign_keys: p_return.v_data[i].v_has_foreign_keys,
@@ -1608,10 +1581,55 @@ function getTablesMariadb(node) {
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, 'cm_table',null,false);
                 v_node.createChildNode('', false,
-                    '/static/OmniDB_app/images/spin.svg', {
+                    'node-spin', {
                         type: 'table_field',
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, null,null,false);
+
+            }
+
+            node.drawChildNodes();
+
+            afterNodeOpenedCallbackMariaDB(node);
+
+        },
+        function(p_return) {
+            nodeOpenError(p_return, node);
+        },
+        'box',
+        false);
+}
+
+/// <summary>
+/// Retrieving sequences.
+/// </summary>
+/// <param name="node">Node object.</param>
+function getSequencesMariadb(node) {
+    node.removeChildNodes();
+    node.createChildNode('', false, 'node-spin', null,
+        null);
+
+    execAjax('/get_sequences_mariadb/',
+        JSON.stringify({
+            "p_database_index": v_connTabControl.selectedTab.tag.selectedDatabaseIndex,
+            "p_schema": null
+        }),
+        function(p_return) {
+
+            node.setText('Sequences (' + p_return.v_data.length + ')');
+
+            node.tag.num_tables = p_return.v_data.length;
+
+            if (node.childNodes.length > 0)
+                node.removeChildNodes();
+
+            for (i = 0; i < p_return.v_data.length; i++) {
+
+                v_node = node.createChildNode(p_return.v_data[i].v_sequence_name,
+                    false,
+                    'fas node-all fa-sort-numeric-down node-sequence', {
+                        type: 'sequence'
+                    }, 'cm_sequence',null,false);
 
             }
 
@@ -1634,7 +1652,7 @@ function getTablesMariadb(node) {
 function getViewsMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
     execAjax('/get_views_mariadb/',
@@ -1655,13 +1673,13 @@ function getViewsMariadb(node) {
             for (i = 0; i < p_return.v_data.length; i++) {
 
                 v_node = node.createChildNode(p_return.v_data[i].v_name,
-                    false, '/static/OmniDB_app/images/view.png', {
+                    false, 'fas node-all fa-eye node-view', {
                         type: 'view',
                         has_triggers: p_return.v_data[i].v_has_triggers,
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, 'cm_view',null,false);
                 v_node.createChildNode('', false,
-                    '/static/OmniDB_app/images/spin.svg', {
+                    'node-spin', {
                         type: 'view_field',
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, null,null,false);
@@ -1685,7 +1703,7 @@ function getViewsMariadb(node) {
 function getViewsColumnsMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
     execAjax('/get_views_columns_mariadb/',
@@ -1701,40 +1719,40 @@ function getViewsColumnsMariadb(node) {
                 node.removeChildNodes();
 
             v_list = node.createChildNode('Columns (' + p_return.v_data.length +
-                ')', false, '/static/OmniDB_app/images/add.png', null,
+                ')', false, 'fas node-all fa-columns node-column', null,
                 null,null,false);
 
             for (i = 0; i < p_return.v_data.length; i++) {
 
                 v_node = v_list.createChildNode(p_return.v_data[i].v_column_name,
-                    false, '/static/OmniDB_app/images/add.png', {
+                    false, 'fas node-all fa-columns node-column', {
                         type: 'table_field',
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, null,null,false);
                 v_node.createChildNode('Type: ' + p_return.v_data[i].v_data_type,
-                    false, '/static/OmniDB_app/images/bullet_red.png',
+                    false, 'fas node-all fa-ellipsis-h node-bullet',
                     null, null,null,false);
 
             }
 
             if (node.tag.has_rules) {
                 v_node = node.createChildNode('Rules', false,
-                    '/static/OmniDB_app/images/rule.png', {
+                    'fas node-all fa-lightbulb node-rule', {
                         type: 'rule_list',
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, 'cm_rules',null,false);
                 v_node.createChildNode('', false,
-                    '/static/OmniDB_app/images/spin.svg', null, null,null,false);
+                    'node-spin', null, null,null,false);
             }
 
             if (node.tag.has_triggers) {
                 v_node = node.createChildNode('Triggers', false,
-                    '/static/OmniDB_app/images/trigger.png', {
+                    'fas node-all fa-bolt node-trigger', {
                         type: 'trigger_list',
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, 'cm_view_triggers',null,false);
                 v_node.createChildNode('', false,
-                    '/static/OmniDB_app/images/spin.svg', null, null,null,false);
+                    'node-spin', null, null,null,false);
             }
 
             node.drawChildNodes();
@@ -1773,8 +1791,6 @@ function getViewDefinitionMariadb(node) {
             //v_connTabControl.selectedTab.tag.tabControl.selectedTab.renameTab(node.text);
             renameTabConfirm(v_connTabControl.selectedTab.tag.tabControl.selectedTab,
                 node.text);
-            v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.sel_filtered_data
-                .value = 1;
 
             var v_div_result = v_connTabControl.selectedTab.tag.tabControl.selectedTab
                 .tag.div_result;
@@ -1807,7 +1823,7 @@ function getViewDefinitionMariadb(node) {
 function getColumnsMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
     execAjax('/get_columns_mariadb/',
@@ -1823,7 +1839,7 @@ function getColumnsMariadb(node) {
                 node.removeChildNodes();
 
             v_list = node.createChildNode('Columns (' + p_return.v_data.length +
-                ')', false, '/static/OmniDB_app/images/add.png', {
+                ')', false, 'fas node-all fa-columns node-column', {
                     type: 'column_list',
                     database: v_connTabControl.selectedTab.tag.selectedDatabase
                 }, 'cm_columns',null,false);
@@ -1831,77 +1847,77 @@ function getColumnsMariadb(node) {
             for (i = 0; i < p_return.v_data.length; i++) {
 
                 v_node = v_list.createChildNode(p_return.v_data[i].v_column_name,
-                    false, '/static/OmniDB_app/images/add.png', {
+                    false, 'fas node-all fa-columns node-column', {
                         type: 'table_field',
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, 'cm_column',null,false);
                 v_node.createChildNode('Type: ' + p_return.v_data[i].v_data_type,
-                    false, '/static/OmniDB_app/images/bullet_red.png',
+                    false, 'fas node-all fa-ellipsis-h node-bullet',
                     null, null,null,false);
                 v_node.createChildNode('Nullable: ' + p_return.v_data[i].v_nullable,
-                    false, '/static/OmniDB_app/images/bullet_red.png',
+                    false, 'fas node-all fa-ellipsis-h node-bullet',
                     null, null,null,false);
 
             }
 
             if (node.tag.has_primary_keys) {
                 v_node = node.createChildNode('Primary Key', false,
-                    '/static/OmniDB_app/images/key.png', {
+                    'fas node-all fa-key node-pkey', {
                         type: 'primary_key',
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, 'cm_pks',null,false);
                 v_node.createChildNode('', false,
-                    '/static/OmniDB_app/images/spin.svg', null, null,null,false);
+                    'node-spin', null, null,null,false);
             }
 
             if (node.tag.has_foreign_keys) {
                 v_node = node.createChildNode('Foreign Keys', false,
-                    '/static/OmniDB_app/images/silver_key.png', {
+                    'fas node-all fa-key node-fkey', {
                         type: 'foreign_keys',
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, 'cm_fks',null,false);
                 v_node.createChildNode('', false,
-                    '/static/OmniDB_app/images/spin.svg', null, null,null,false);
+                    'node-spin', null, null,null,false);
             }
 
             if (node.tag.has_uniques) {
                 v_node = node.createChildNode('Uniques', false,
-                    '/static/OmniDB_app/images/blue_key.png', {
+                    'fas node-all fa-key node-unique', {
                         type: 'uniques',
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, 'cm_uniques',null,false);
                 v_node.createChildNode('', false,
-                    '/static/OmniDB_app/images/spin.svg', null, null,null,false);
+                    'node-spin', null, null,null,false);
             }
 
             if (node.tag.has_indexes) {
                 v_node = node.createChildNode('Indexes', false,
-                    '/static/OmniDB_app/images/index.png', {
+                    'fas node-all fa-thumbtack node-index', {
                         type: 'indexes',
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, 'cm_indexes',null,false);
                 v_node.createChildNode('', false,
-                    '/static/OmniDB_app/images/spin.svg', null, null,null,false);
+                    'node-spin', null, null,null,false);
             }
 
             if (node.tag.has_triggers) {
                 v_node = node.createChildNode('Triggers', false,
-                    '/static/OmniDB_app/images/trigger.png', {
+                    'fas node-all fa-bolt node-trigger', {
                         type: 'trigger_list',
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, 'cm_triggers',null,false);
                 v_node.createChildNode('', false,
-                    '/static/OmniDB_app/images/spin.svg', null, null,null,false);
+                    'node-spin', null, null,null,false);
             }
 
             if (node.tag.has_partitions) {
                 v_node = node.createChildNode('Partitions', false,
-                    '/static/OmniDB_app/images/partition.png', {
+                    'fas node-all fa-table node-partition', {
                         type: 'partition_list',
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, 'cm_partitions',null,false);
                 v_node.createChildNode('', false,
-                    '/static/OmniDB_app/images/spin.svg', null, null,null,false);
+                    'node-spin', null, null,null,false);
             }
 
             node.drawChildNodes();
@@ -1923,7 +1939,7 @@ function getColumnsMariadb(node) {
 function getPKMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
     execAjax('/get_pk_mariadb/',
@@ -1946,12 +1962,12 @@ function getPKMariadb(node) {
 
             if (p_return.v_data.length > 0) {
                 v_node = node.createChildNode(p_return.v_data[0][0], false,
-                    '/static/OmniDB_app/images/key.png', {
+                    'fas node-all fa-key node-pkey', {
                         type: 'pk',
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, 'cm_pk');
                 v_node.createChildNode('', false,
-                    '/static/OmniDB_app/images/spin.svg', {
+                    'node-spin', {
                         type: 'pk_field',
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, null);
@@ -1974,7 +1990,7 @@ function getPKMariadb(node) {
 function getPKColumnsMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
     execAjax('/get_pk_columns_mariadb/',
@@ -1993,7 +2009,7 @@ function getPKColumnsMariadb(node) {
             for (i = 0; i < p_return.v_data.length; i++) {
 
                 v_node.createChildNode(p_return.v_data[i][0], false,
-                    '/static/OmniDB_app/images/add.png', null, null,null,false);
+                    'fas node-all fa-columns node-column', null, null,null,false);
 
             }
 
@@ -2016,7 +2032,7 @@ function getPKColumnsMariadb(node) {
 function getUniquesMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
     execAjax('/get_uniques_mariadb/',
@@ -2039,13 +2055,13 @@ function getUniquesMariadb(node) {
 
                     v_node = node.createChildNode(p_return.v_data[i][0],
                         false,
-                        '/static/OmniDB_app/images/blue_key.png', {
+                        'fas node-all fa-key node-unique', {
                             type: 'unique',
                             database: v_connTabControl.selectedTab.tag.selectedDatabase
                         }, 'cm_unique',null,false);
 
                     v_node.createChildNode('', false,
-                        '/static/OmniDB_app/images/spin.svg', {
+                        'node-spin', {
                             type: 'unique_field',
                             database: v_connTabControl.selectedTab.tag.selectedDatabase
                         }, null,null,false);
@@ -2073,7 +2089,7 @@ function getUniquesMariadb(node) {
 function getUniquesColumnsMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
     execAjax('/get_uniques_columns_mariadb/',
@@ -2094,7 +2110,7 @@ function getUniquesColumnsMariadb(node) {
                 for (i = 0; i < p_return.v_data.length; i++) {
 
                     v_node.createChildNode(p_return.v_data[i][0], false,
-                        '/static/OmniDB_app/images/add.png', null, null,null,false
+                        'fas node-all fa-columns node-column', null, null,null,false
                     );
 
                 }
@@ -2120,7 +2136,7 @@ function getUniquesColumnsMariadb(node) {
 function getIndexesMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
     execAjax('/get_indexes_mariadb/',
@@ -2145,13 +2161,13 @@ function getIndexesMariadb(node) {
 
                     v_node = node.createChildNode(p_return.v_data[i][0] +
                         ' (' + p_return.v_data[i][1] + ')', false,
-                        '/static/OmniDB_app/images/index.png', {
+                        'fas node-all fa-thumbtack node-index', {
                             type: 'index',
                             database: v_connTabControl.selectedTab.tag.selectedDatabase
                         }, 'cm_index',null,false);
 
                     v_node.createChildNode('', false,
-                        '/static/OmniDB_app/images/spin.svg', {
+                        'node-spin', {
                             type: 'index_field'
                         }, null,null,false);
 
@@ -2178,7 +2194,7 @@ function getIndexesMariadb(node) {
 function getIndexesColumnsMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
     execAjax('/get_indexes_columns_mariadb/',
@@ -2200,7 +2216,7 @@ function getIndexesColumnsMariadb(node) {
                 for (i = 0; i < p_return.v_data.length; i++) {
 
                     node.createChildNode(p_return.v_data[i][0], false,
-                        '/static/OmniDB_app/images/add.png', null, null,null,false
+                        'fas node-all fa-columns node-column', null, null,null,false
                     );
 
                 }
@@ -2226,7 +2242,7 @@ function getIndexesColumnsMariadb(node) {
 function getFKsMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
     execAjax('/get_fks_mariadb/',
@@ -2247,21 +2263,21 @@ function getFKsMariadb(node) {
 
                 v_node = node.createChildNode(p_return.v_data[i][0],
                     false,
-                    '/static/OmniDB_app/images/silver_key.png', {
+                    'fas node-all fa-key node-fkey', {
                         type: 'foreign_key',
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, 'cm_fk',null,false);
                 v_node.createChildNode('Referenced Table: ' + p_return.v_data[
                         i][1], false,
-                    '/static/OmniDB_app/images/table.png', null,
+                    'fas node-all fa-table node-table', null,
                     null,null,false);
                 v_node.createChildNode('Delete Rule: ' + p_return.v_data[
                         i][2], false,
-                    '/static/OmniDB_app/images/bullet_red.png',
+                    'fas node-all fa-ellipsis-h node-bullet',
                     null, null,null,false);
                 v_node.createChildNode('Update Rule: ' + p_return.v_data[
                         i][3], false,
-                    '/static/OmniDB_app/images/bullet_red.png',
+                    'fas node-all fa-ellipsis-h node-bullet',
                     null, null,null,false);
 
                 v_curr_fk = p_return.v_data[i][0];
@@ -2287,7 +2303,7 @@ function getFKsMariadb(node) {
 function getFKsColumnsMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
     execAjax('/get_fks_columns_mariadb/',
@@ -2305,23 +2321,23 @@ function getFKsColumnsMariadb(node) {
 
             node.createChildNode('Referenced Table: ' + p_return.v_data[
                     0][0], false,
-                '/static/OmniDB_app/images/table.png', null,
+                'fas node-all fa-table node-table', null,
                 null,null,false);
             node.createChildNode('Delete Rule: ' + p_return.v_data[
                     0][1], false,
-                '/static/OmniDB_app/images/bullet_red.png',
+                'fas node-all fa-ellipsis-h node-bullet',
                 null, null,null,false);
             node.createChildNode('Update Rule: ' + p_return.v_data[
                     0][2], false,
-                '/static/OmniDB_app/images/bullet_red.png',
+                'fas node-all fa-ellipsis-h node-bullet',
                 null, null,null,false);
 
             for (i = 0; i < p_return.v_data.length; i++) {
 
                 node.createChildNode(p_return.v_data[i][3] +
-                    ' <img style="vertical-align: middle;" src="/static/OmniDB_app/images/arrow_right.png"/> ' +
+                    " <i class='fas node-all fa-arrow-right'></i> " +
                     p_return.v_data[i][4], false,
-                    '/static/OmniDB_app/images/add.png', null, null,null,false);
+                    'fas node-all fa-columns node-column', null, null,null,false);
 
             }
 
@@ -2345,7 +2361,7 @@ function getFKsColumnsMariadb(node) {
 function getTriggersMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
     execAjax('/get_triggers_mariadb/',
@@ -2375,11 +2391,11 @@ function getTriggersMariadb(node) {
                         }, 'cm_trigger');
                     v_node.createChildNode('Enabled: ' + p_return.v_data[i]
                         [1], false,
-                        '/static/OmniDB_app/images/bullet_red.png',
+                        'fas node-all fa-ellipsis-h node-bullet',
                         null, null);
                     v_node.createChildNode('Function: ' + p_return.v_data[i]
                         [2], false,
-                        '/static/OmniDB_app/images/bullet_red.png',
+                        'fas node-all fa-ellipsis-h node-bullet',
                         null, null);
 
                 }
@@ -2401,7 +2417,7 @@ function getTriggersMariadb(node) {
 function getPartitionsMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
     execAjax('/get_partitions_mariadb/',
@@ -2451,7 +2467,7 @@ function getPartitionsMariadb(node) {
 function getFunctionsMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
 
@@ -2473,13 +2489,13 @@ function getFunctionsMariadb(node) {
             for (i = 0; i < p_return.v_data.length; i++) {
 
                 v_node = node.createChildNode(p_return.v_data[i].v_name,
-                    false, '/static/OmniDB_app/images/gear2.png', {
+                    false, 'fas node-all fa-cog node-function', {
                         type: 'function',
                         id: p_return.v_data[i].v_id,
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, 'cm_function',null,false);
                 v_node.createChildNode('', false,
-                    '/static/OmniDB_app/images/spin.svg', {
+                    'node-spin', {
                         type: 'function_field'
                     }, null,null,false);
 
@@ -2504,7 +2520,7 @@ function getFunctionsMariadb(node) {
 function getFunctionFieldsMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
     execAjax('/get_function_fields_mariadb/',
@@ -2525,17 +2541,17 @@ function getFunctionFieldsMariadb(node) {
 
                 if (p_return.v_data[i].v_type == 'O')
                     v_node = node.createChildNode(p_return.v_data[i].v_name,
-                        false, '/static/OmniDB_app/images/output.png', null,
+                        false, 'fas node-all fa-arrow-right node-function-field', null,
                         null,null,false);
                 else {
                     if (p_return.v_data[i].v_type == 'I')
                         v_node = node.createChildNode(p_return.v_data[i].v_name,
-                            false, '/static/OmniDB_app/images/input.png',
+                            false, 'fas node-all fa-arrow-left node-function-field',
                             null, null,null,false);
                     else
                         v_node = node.createChildNode(p_return.v_data[i].v_name,
                             false,
-                            '/static/OmniDB_app/images/input_output.png',
+                            'fas node-all fa-exchange-alt node-function-field',
                             null, null,null,false);
                 }
 
@@ -2606,8 +2622,6 @@ function getFunctionDefinitionMariadb(node) {
             //v_connTabControl.selectedTab.tag.tabControl.selectedTab.renameTab(node.text);
             renameTabConfirm(v_connTabControl.selectedTab.tag.tabControl.selectedTab,
                 node.text);
-            v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.sel_filtered_data
-                .value = 1;
 
             var v_div_result = v_connTabControl.selectedTab.tag.tabControl.selectedTab
                 .tag.div_result;
@@ -2640,7 +2654,7 @@ function getFunctionDefinitionMariadb(node) {
 function getProceduresMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
 
@@ -2662,13 +2676,13 @@ function getProceduresMariadb(node) {
             for (i = 0; i < p_return.v_data.length; i++) {
 
                 v_node = node.createChildNode(p_return.v_data[i].v_name,
-                    false, '/static/OmniDB_app/images/gear2.png', {
+                    false, 'fas node-all fa-cog node-procedure', {
                         type: 'procedure',
                         id: p_return.v_data[i].v_id,
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, 'cm_procedure',null,false);
                 v_node.createChildNode('', false,
-                    '/static/OmniDB_app/images/spin.svg', {
+                    'node-spin', {
                         type: 'procedure_field',
                         database: v_connTabControl.selectedTab.tag.selectedDatabase
                     }, null,null,false);
@@ -2694,7 +2708,7 @@ function getProceduresMariadb(node) {
 function getProcedureFieldsMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
     execAjax('/get_procedure_fields_mariadb/',
@@ -2715,17 +2729,17 @@ function getProcedureFieldsMariadb(node) {
 
                 if (p_return.v_data[i].v_type == 'O')
                     v_node = node.createChildNode(p_return.v_data[i].v_name,
-                        false, '/static/OmniDB_app/images/output.png', null,
+                        false, 'fas node-all fa-arrow-right node-function-field', null,
                         null,null,false);
                 else {
                     if (p_return.v_data[i].v_type == 'I')
                         v_node = node.createChildNode(p_return.v_data[i].v_name,
-                            false, '/static/OmniDB_app/images/input.png',
+                            false, 'fas node-all fa-arrow-left node-function-field',
                             null, null,null,false);
                     else
                         v_node = node.createChildNode(p_return.v_data[i].v_name,
                             false,
-                            '/static/OmniDB_app/images/input_output.png',
+                            'fas node-all fa-exchange-alt node-function-field',
                             null, null,null,false);
                 }
 
@@ -2796,8 +2810,6 @@ function getProcedureDefinitionMariadb(node) {
             //v_connTabControl.selectedTab.tag.tabControl.selectedTab.renameTab(node.text);
             renameTabConfirm(v_connTabControl.selectedTab.tag.tabControl.selectedTab,
                 node.text);
-            v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.sel_filtered_data
-                .value = 1;
 
             var v_div_result = v_connTabControl.selectedTab.tag.tabControl.selectedTab
                 .tag.div_result;
@@ -2831,7 +2843,7 @@ function getProcedureDefinitionMariadb(node) {
 function getTriggerFunctionsMariadb(node) {
 
     node.removeChildNodes();
-    node.createChildNode('', false, '/static/OmniDB_app/images/spin.svg', null,
+    node.createChildNode('', false, 'node-spin', null,
         null);
 
     execAjax('/get_triggerfunctions_mariadb/',
@@ -2938,11 +2950,6 @@ function TemplateSelectMariadb(p_schema, p_table) {
 
             v_connTabControl.selectedTab
                 .tag.tabControl.selectedTab
-                .tag.sel_filtered_data.value =
-                1;
-
-            v_connTabControl.selectedTab
-                .tag.tabControl.selectedTab
                 .tag.editor.setValue(p_return.v_data.v_template);
             v_connTabControl.selectedTab
                 .tag.tabControl.selectedTab
@@ -3035,7 +3042,7 @@ function nodeOpenError(p_return, p_node) {
             "Error - <a class='a_link' onclick='showError(&quot;" +
             p_return.v_data.replace(/\n/g, "<br/>").replace(/"/g, '') +
             "&quot;)'>View Detail</a>", false,
-            '/static/OmniDB_app/images/tab_close.png', {
+            'fas fa-times node-error', {
                 type: 'error',
                 message: p_return.v_data
             }, null);
@@ -3043,13 +3050,12 @@ function nodeOpenError(p_return, p_node) {
 
 }
 
-/*function getMajorVersion(p_version) {
-    var v_version = p_version.split(' (')[0]
-    var tmp = v_version.replace('PostgreSQL ', '').replace('beta', '.').split(
-        '.')
+function getMajorVersionMariadb(p_version) {
+    var v_version = p_version.split('-')[0]
+    var tmp = v_version.replace('MariaDB ', '').split('.')
     tmp.pop()
     return tmp.join('.')
-}*/
+}
 
 function mariadbTerminateBackendConfirm(p_pid) {
     execAjax('/kill_backend_mariadb/',

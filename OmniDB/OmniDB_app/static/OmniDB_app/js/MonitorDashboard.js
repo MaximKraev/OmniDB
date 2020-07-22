@@ -1,13 +1,26 @@
 /*
-Copyright 2015-2017 The OmniDB Team
+The MIT License (MIT)
 
-This file is part of OmniDB.
+Portions Copyright (c) 2015-2019, The OmniDB Team
+Portions Copyright (c) 2017-2019, 2ndQuadrant Limited
 
-OmniDB is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-OmniDB is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-You should have received a copy of the GNU General Public License along with OmniDB. If not, see http://www.gnu.org/licenses/.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 */
 
 function closeMonitorUnit(p_div) {
@@ -19,6 +32,10 @@ function closeMonitorUnit(p_div) {
 
       //Clear timeout
       clearTimeout(v_unit.timeout_object);
+
+      if (v_unit.type == 'graph' && v_unit.object != null) {
+        v_unit.object.destroy();
+      }
 
       v_unit.div.parentElement.removeChild(v_unit.div);
       v_tab_tag.units.splice(i,1);
@@ -111,8 +128,8 @@ function buildMonitorUnit(p_unit, p_first) {
       refreshMonitorDashboard(true,v_tab_tag,div);
     }
   })(div);
-  button_refresh.innerHTML = '<img src="/static/OmniDB_app/images/refresh.png"/>';
-  button_refresh.classList.add('unit_header_element');
+  button_refresh.innerHTML = "<i class='fas fa-sync-alt fa-light'></i>";
+  button_refresh.className = 'unit_header_element bt_icon_only';
   button_refresh.title = 'Refresh';
   var button_pause = document.createElement('button');
   button_pause.onclick = (function(div) {
@@ -120,8 +137,8 @@ function buildMonitorUnit(p_unit, p_first) {
       pauseMonitorUnit(div);
     }
   })(div);
-  button_pause.innerHTML = '<img src="/static/OmniDB_app/images/pause.png"/>';
-  button_pause.classList.add('unit_header_element');
+  button_pause.innerHTML = "<i class='fas fa-pause-circle fa-light'></i>";
+  button_pause.className = 'unit_header_element bt_icon_only';
   button_pause.title = 'Pause';
   var button_play = document.createElement('button');
   button_play.onclick = (function(div) {
@@ -129,8 +146,8 @@ function buildMonitorUnit(p_unit, p_first) {
       playMonitorUnit(div);
     }
   })(div);
-  button_play.innerHTML = '<img src="/static/OmniDB_app/images/play.png"/>';
-  button_play.classList.add('unit_header_element');
+  button_play.innerHTML = "<i class='fas fa-play-circle fa-light'></i>";
+  button_play.className = 'unit_header_element bt_icon_only';
   button_play.title = 'Play';
   button_play.style.display = 'none';
   var interval = document.createElement('input');
@@ -156,15 +173,19 @@ function buildMonitorUnit(p_unit, p_first) {
       closeMonitorUnit(div);
     }
   })(div);
-  button_close.innerHTML = '<img src="/static/OmniDB_app/images/tab_close.png"/>';
-  button_close.classList.add('unit_header_element');
-  button_close.classList.add('unit_close_button');
+  button_close.innerHTML = "<i class='fas fa-times icon-close'></i>";
+  button_close.className = 'unit_header_element unit_close_button bt_icon_only';
   var details = document.createElement('div');
   details.classList.add('unit_header_element');
   details.innerHTML = '';
   var div_error = document.createElement('div');
   div_error.classList.add('error_text');
   var div_content = document.createElement('div');
+  var div_label = document.createElement('div');
+  div_label.className = 'dashboard_unit_legend_box';
+
+  var div_content_group = document.createElement('div');
+  div_content_group.className = 'dashboard_unit_content_group';
 
   div_header.appendChild(title);
   div_header.appendChild(button_refresh);
@@ -177,7 +198,11 @@ function buildMonitorUnit(p_unit, p_first) {
   div.appendChild(div_loading);
   div.appendChild(div_header);
   div.appendChild(div_error);
-  div.appendChild(div_content);
+  div_content_group.appendChild(div_content);
+  div_content_group.appendChild(div_label);
+  div.appendChild(div_content_group);
+
+
   if (p_first)
     $(v_dashboard_div).prepend(div);
   else
@@ -189,13 +214,16 @@ function buildMonitorUnit(p_unit, p_first) {
   v_unit = {
     'type': '',
     'object': null,
+    'object_data': null,
     'saved_id': v_return_unit.v_saved_id,
     'id': v_return_unit.v_id,
+    'plugin_name': v_return_unit.v_plugin_name,
     'div': div,
     'div_loading': div_loading,
     'div_details': details,
     'div_error': div_error,
     'div_content': div_content,
+    'div_label': div_label,
     'button_pause': button_pause,
     'button_play': button_play,
     'input_interval': interval,
@@ -230,12 +258,15 @@ function startMonitorDashboard() {
 
 }
 
-function includeMonitorUnit(p_id) {
+function includeMonitorUnit(p_id,p_plugin_name) {
   var v_grid = v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.unit_list_grid;
   var v_tab_tag = v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag;
   var v_row_data = v_grid.getDataAtRow(v_grid.getSelected()[0][0]);
+  var v_plugin_name = '';
+  if (p_plugin_name!=null)
+    v_plugin_name = p_plugin_name;
 
-  var div = buildMonitorUnit({'v_saved_id': -1, 'v_id': p_id, 'v_title': v_row_data[1], 'v_interval': v_row_data[3]},true);
+  var div = buildMonitorUnit({'v_saved_id': -1, 'v_id': p_id, 'v_title': v_row_data[1], 'v_interval': v_row_data[3], 'v_plugin_name': v_plugin_name},true);
   refreshMonitorDashboard(true,v_tab_tag,div);
 }
 
@@ -269,17 +300,20 @@ function editMonitorUnit(p_unit_id) {
   v_connTabControl.tag.createNewMonitorUnitTab();
 
   var input1 = JSON.stringify({"p_database_index": v_connTabControl.selectedTab.tag.selectedDatabaseIndex,
-                               "p_tab_id": v_connTabControl.selectedTab.id});
+                               "p_tab_id": v_connTabControl.selectedTab.id,
+                               "p_mode": 1});
 
   execAjax('/get_monitor_unit_list/',
 				input1,
 				function(p_return) {
 
           var v_select_template = v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.select_template;
+          v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.template_list = [];
 
           p_return.v_data.data.forEach(function(p_unit, p_index) {
+            v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.template_list.push({'plugin_name':p_unit[0], 'id': p_return.v_data.id_list[p_index]})
             var v_option = document.createElement('option');
-            v_option.value = p_return.v_data.id_list[p_index];
+            v_option.value = p_index;
             v_option.innerHTML = '(' + p_unit[2] + ') ' + p_unit[1];
             v_select_template.appendChild(v_option);
           });
@@ -365,13 +399,15 @@ function saveMonitorScript() {
 
 function selectUnitTemplate(p_value) {
   if (p_value!=-1) {
-    var input = JSON.stringify({"p_unit_id": p_value});
+    var v_element_item = v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.template_list[p_value];
+    var input = JSON.stringify({"p_unit_id": v_element_item.id, "p_unit_plugin_name": v_element_item.plugin_name});
 
     execAjax('/get_monitor_unit_template/',
   				input,
   				function(p_return) {
 
             v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.div_result.innerHTML = '';
+            v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.div_result_label.innerHTML = '';
             v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.select_type.value = p_return.v_data.type;
             v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.input_interval.value = p_return.v_data.interval;
 
@@ -408,10 +444,12 @@ function testMonitorScript() {
 				function(p_return) {
 
           var v_tab_tag = v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag;
+          v_tab_tag.div_result_label.innerHTML = '';
           var v_type = v_tab_tag.select_type.value;
           var v_div_result = v_tab_tag.div_result;
 
           v_div_result.innerHTML = '';
+          v_div_result.className = '';
 
           if (v_tab_tag.object!=null) {
             v_tab_tag.object.destroy();
@@ -424,11 +462,44 @@ function testMonitorScript() {
             }
             else if (v_type=='chart_append' || v_type=='chart') {
               var canvas = document.createElement('canvas');
+              canvas.style.width = '435px';
               v_div_result.appendChild(canvas);
 
+              var v_return_unit = p_return.v_data;
+
               var ctx = canvas.getContext('2d');
-              v_tab_tag.object = new Chart(ctx, p_return.v_data.v_object);
+              var v_show_legend = false;
+              try {
+                v_return_unit.v_object.options.responsive = false;
+                if (v_return_unit.v_object.options.legend==null) {
+                  v_return_unit.v_object.options.legend = {
+                    'display': false
+                  }
+                  v_show_legend = true;
+                }
+                else {
+                  if (v_return_unit.v_object.options.legend.display==true)
+                    v_show_legend = true;
+                  v_return_unit.v_object.options.legend.display = false;
+                }
+              }
+              catch (err) {
+
+              }
+              v_return_unit.v_object.options.legendCallback = function(chart) {
+                var text = [];
+                for (var i = 0; i < chart.legend.legendItems.length; i++) {
+                    text.push('<span class="dashboard_unit_label_group"><span class="dashboard_unit_label_box" style="background-color:' + chart.legend.legendItems[i].fillStyle + '"></span><span id="legend-' + i + '-item" class="dashboard_unit_label" onclick="updateDataset(event, ' + '\'' + i + '\'' + ')">' + chart.legend.legendItems[i].text + '</span></span>');
+                }
+                return text.join("");
+              }
+              v_tab_tag.object = new Chart(ctx, v_return_unit.v_object);
               adjustChartTheme(v_tab_tag.object);
+              if (v_show_legend) {
+                var v_legend = v_tab_tag.object.generateLegend();
+                v_tab_tag.div_result_label.innerHTML += v_legend;
+              }
+
 
             }
             else if (v_type=='grid') {
@@ -440,9 +511,10 @@ function testMonitorScript() {
                 col.title =  p_return.v_data.v_object.columns[j];
                 columnProperties.push(col);
               }
-
+              v_div_result.className = 'unit_grid';
               v_tab_tag.object = new Handsontable(v_div_result,
               {
+                licenseKey: 'non-commercial-and-evaluation',
                 data: p_return.v_data.v_object.data,
                 columns : columnProperties,
                 colHeaders : true,
@@ -457,9 +529,14 @@ function testMonitorScript() {
                     if (key === 'view_data') {
                         editCellData(this,options[0].start.row,options[0].start.col,this.getDataAtCell(options[0].start.row,options[0].start.col),false);
                     }
+                    else if (key === 'copy') {
+                      this.selectCell(options[0].start.row,options[0].start.col,options[0].end.row,options[0].end.col);
+                      document.execCommand('copy');
+                    }
                   },
                   items: {
-                    "view_data": {name: '<div style=\"position: absolute;\"><img class="img_ht" src=\"/static/OmniDB_app/images/rename.png\"></div><div style=\"padding-left: 30px;\">View Content</div>'}
+                    "copy": {name: '<div style=\"position: absolute;\"><i class=\"fas fa-copy cm-all\" style=\"vertical-align: middle;\"></i></div><div style=\"padding-left: 30px;\">Copy</div>'},
+                    "view_data": {name: '<div style=\"position: absolute;\"><i class=\"fas fa-edit cm-all\" style=\"vertical-align: middle;\"></i></div><div style=\"padding-left: 30px;\">View Content</div>'}
                   }
                   },
                     cells: function (row, col, prop) {
@@ -472,6 +549,12 @@ function testMonitorScript() {
                 }
               });
 
+            }
+            else if (v_type=='graph') {
+              v_div_result.className = 'unit_graph';
+              p_return.v_data.v_object.container = v_div_result;
+              v_tab_tag.object = cytoscape(p_return.v_data.v_object);
+              adjustGraphTheme(v_tab_tag.object);
             }
           }
           catch(err) {
@@ -498,10 +581,23 @@ function testMonitorScript() {
 
 }
 
+function refreshMonitorUnitsObjects() {
+  v_tab_tag = v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag;
+  for (var i=0; i<v_tab_tag.units.length; i++) {
+    if (v_tab_tag.units[i].type=='grid') {
+      if (v_tab_tag.units[i].object) {
+        v_tab_tag.units[i].object.render();
+      }
+    }
+  }
+
+}
+
 function showMonitorUnitList() {
 
   var input = JSON.stringify({"p_database_index": v_connTabControl.selectedTab.tag.selectedDatabaseIndex,
-                              "p_tab_id": v_connTabControl.selectedTab.id});
+                              "p_tab_id": v_connTabControl.selectedTab.id,
+                              "p_mode": 0});
 
   var v_grid_div = v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.unit_list_grid_div;
   v_grid_div.innerHTML = '';
@@ -517,13 +613,13 @@ function showMonitorUnitList() {
           var col = new Object();
           col.readOnly = true;
           col.title =  'Actions';
-          col.width = '60px';
+          col.width = '65px';
           columnProperties.push(col);
 
           var col = new Object();
           col.readOnly = true;
           col.title =  'Title';
-          col.width = '210px;'
+          col.width = '300px;'
           columnProperties.push(col);
 
           var col = new Object();
@@ -546,6 +642,7 @@ function showMonitorUnitList() {
 
           v_connTabControl.selectedTab.tag.tabControl.selectedTab.tag.unit_list_grid = new Handsontable(v_grid_div,
           {
+            licenseKey: 'non-commercial-and-evaluation',
             data: p_return.v_data.data,
             columns : columnProperties,
             colHeaders : true,
@@ -561,9 +658,14 @@ function showMonitorUnitList() {
                 if (key === 'view_data') {
                     editCellData(this,options[0].start.row,options[0].start.col,this.getDataAtCell(options[0].start.row,options[0].start.col),false);
                 }
+                else if (key === 'copy') {
+                  this.selectCell(options[0].start.row,options[0].start.col,options[0].end.row,options[0].end.col);
+                  document.execCommand('copy');
+                }
               },
               items: {
-                "view_data": {name: '<div style=\"position: absolute;\"><img class="img_ht" src=\"/static/OmniDB_app/images/rename.png\"></div><div style=\"padding-left: 30px;\">View Content</div>'}
+                "copy": {name: '<div style=\"position: absolute;\"><i class=\"fas fa-copy cm-all\" style=\"vertical-align: middle;\"></i></div><div style=\"padding-left: 30px;\">Copy</div>'},
+                "view_data": {name: '<div style=\"position: absolute;\"><i class=\"fas fa-edit cm-all\" style=\"vertical-align: middle;\"></i></div><div style=\"padding-left: 30px;\">View Content</div>'}
               }
               },
                 cells: function (row, col, prop) {
@@ -601,13 +703,27 @@ function refreshMonitorDashboard(p_loading,p_tab_tag,p_div) {
       if (!p_div) {
         if (p_loading)
           v_tab_tag.units[i].div_loading.style.display = 'block';
-        v_units.push({ 'saved_id': v_tab_tag.units[i].saved_id, 'id': v_tab_tag.units[i].id, 'sequence': v_tab_tag.units[i].unit_sequence, 'rendered': v_unit_rendered, 'interval': v_tab_tag.units[i].input_interval.value })
+        v_units.push({ 'saved_id': v_tab_tag.units[i].saved_id,
+                       'id': v_tab_tag.units[i].id,
+                       'sequence': v_tab_tag.units[i].unit_sequence,
+                       'rendered': v_unit_rendered,
+                       'interval': v_tab_tag.units[i].input_interval.value,
+                       'plugin_name': v_tab_tag.units[i].plugin_name,
+                       'object_data': v_tab_tag.units[i].object_data
+                     })
         clearTimeout(v_tab_tag.units[i].timeout_object);
       }
       else if (p_div == v_tab_tag.units[i].div) {
         if (p_loading)
           v_tab_tag.units[i].div_loading.style.display = 'block';
-        v_units.push({ 'saved_id': v_tab_tag.units[i].saved_id, 'id': v_tab_tag.units[i].id, 'sequence': v_tab_tag.units[i].unit_sequence, 'rendered': v_unit_rendered, 'interval': v_tab_tag.units[i].input_interval.value })
+        v_units.push({ 'saved_id': v_tab_tag.units[i].saved_id,
+                       'id': v_tab_tag.units[i].id,
+                       'sequence': v_tab_tag.units[i].unit_sequence,
+                       'rendered': v_unit_rendered,
+                       'interval': v_tab_tag.units[i].input_interval.value,
+                       'plugin_name': v_tab_tag.units[i].plugin_name,
+                       'object_data': v_tab_tag.units[i].object_data
+                     })
         clearTimeout(v_tab_tag.units[i].timeout_object);
         break;
       }
@@ -620,17 +736,28 @@ function refreshMonitorDashboard(p_loading,p_tab_tag,p_div) {
   	execAjax('/refresh_monitor_units/',
   				input,
   				function(p_return) {
-
             for (var i=0; i<p_return.v_data.length; i++) {
 
               var v_return_unit = p_return.v_data[i];
 
               var v_unit = null;
               //find corresponding object
-              for (var i=0; i<v_tab_tag.units.length; i++) {
-                if (v_return_unit.v_sequence == v_tab_tag.units[i].unit_sequence) {
-                  v_tab_tag.units[i].saved_id = v_return_unit.v_saved_id;
-                  v_unit = v_tab_tag.units[i];
+              for (var p=0; p<v_tab_tag.units.length; p++) {
+                if (v_return_unit.v_sequence == v_tab_tag.units[p].unit_sequence) {
+                  v_tab_tag.units[p].saved_id = v_return_unit.v_saved_id;
+                  v_tab_tag.units[p].type = v_return_unit.v_type;
+                  if (v_return_unit.v_object) {
+                    if (v_return_unit.v_object.data) {
+                      v_tab_tag.units[p].object_data = JSON.parse(JSON.stringify(v_return_unit.v_object.data));
+                    }
+                    else if (v_return_unit.v_object.elements) {
+                      v_tab_tag.units[p].object_data = JSON.parse(JSON.stringify(v_return_unit.v_object.elements));
+                    }
+                    else {
+                      v_tab_tag.units[p].object_data = JSON.parse(JSON.stringify(v_return_unit.v_object));
+                    }
+                  }
+                  v_unit = v_tab_tag.units[p];
                   break;
                 }
               }
@@ -648,8 +775,8 @@ function refreshMonitorDashboard(p_loading,p_tab_tag,p_div) {
 
                     v_unit.div_error.innerHTML = v_return_unit.v_message;
                     v_unit.error = true;
-                    v_unit.object = null;
-                    v_unit.div_content.innerHTML = '';
+                    //v_unit.object = null;
+                    //v_unit.div_content.innerHTML = '';
 
                   }
                   // New chart
@@ -657,26 +784,150 @@ function refreshMonitorDashboard(p_loading,p_tab_tag,p_div) {
                     v_unit.div_content.innerHTML = '';
 
                     var canvas = document.createElement('canvas');
+                    canvas.style.width = '435px';
                     v_unit.div_content.appendChild(canvas);
 
                     var ctx = canvas.getContext('2d');
+                    var v_show_legend = false;
+                    try {
+                      v_return_unit.v_object.options.responsive = false;
+                      if (v_return_unit.v_object.options.legend==null) {
+                        v_return_unit.v_object.options.legend = {
+                          'display': false
+                        }
+                        v_show_legend = true;
+                      }
+                      else {
+                        if (v_return_unit.v_object.options.legend.display==true)
+                          v_show_legend = true;
+                        v_return_unit.v_object.options.legend.display = false;
+                      }
+                    }
+                    catch (err) {
+
+                    }
+                    v_return_unit.v_object.options.legendCallback = function(chart) {
+                      var text = [];
+                      for (var j=0; j < chart.legend.legendItems.length; j++) {
+                          text.push('<span class="dashboard_unit_label_group"><span class="dashboard_unit_label_box" style="background-color:' + chart.legend.legendItems[j].fillStyle + '"></span><span id="legend-' + i + '-item" class="dashboard_unit_label" onclick="updateDataset(event, ' + '\'' + j + '\'' + ')">' + chart.legend.legendItems[j].text + '</span></span>');
+                      }
+                      return text.join("");
+                    }
                     var v_chart = new Chart(ctx, v_return_unit.v_object);
                     adjustChartTheme(v_chart);
+                    if (v_show_legend) {
+                      var v_legend = v_chart.generateLegend();
+                      v_unit.div_label.innerHTML = v_legend;
+                    }
 
                     v_unit.object = v_chart;
 
                   }
                   // Update existing chart
                   else {
-                    //Don't append, simply replace labels and datasets
+                    //Don't append, simply update labels and datasets
                     if (v_return_unit.v_type=='chart') {
+
+                      //checking labels
+                      var v_need_rebuild_legend = false;
+
+                      //foreach dataset in existing chart, check if it still exists, if not, remove it
+                      for (var j=v_unit.object.data.datasets.length-1; j>=0; j--) {
+                        var dataset = v_unit.object.data.datasets[j];
+
+                        var v_found = false;
+                        for (var k=0; k<v_return_unit.v_object.datasets.length; k++) {
+                          var return_dataset = v_return_unit.v_object.datasets[k];
+                          if (return_dataset.label == dataset.label) {
+                            v_found = true;
+                            break;
+                          }
+                        }
+                        //dataset doesn't exist, remove it
+                        if (!v_found) {
+                          v_need_rebuild_legend = true;
+                          v_unit.object.data.datasets.splice(j,1);
+                        }
+                      }
+
+                      //foreach label in existing chart, check if it still exists, if not, legend needs to be rebuilt
+                      for (var j=v_unit.object.data.labels.length-1; j>=0; j--) {
+                        var v_found = false;
+                        for (var k=0; k<v_return_unit.v_object.labels.length; k++) {
+                          if (JSON.stringify(v_return_unit.v_object.labels[k]) == JSON.stringify(v_unit.object.data.labels[j])) {
+                            v_found = true;
+                            break;
+                          }
+                        }
+                        if (!v_found) {
+                          v_need_rebuild_legend = true;
+                        }
+                      }
+
+                      //foreach dataset in returning data, find corresponding dataset in existing chart
+                      for (var j=0; j<v_return_unit.v_object.datasets.length; j++) {
+                        var return_dataset = v_return_unit.v_object.datasets[j];
+
+                        //checking datasets
+                        var v_found = false;
+                        for (var k=0; k<v_unit.object.data.datasets.length; k++) {
+                          var dataset = v_unit.object.data.datasets[k];
+                          //Dataset exists, update data and adjust colors
+                          if (return_dataset.label == dataset.label) {
+                            var new_dataset = dataset;
+
+                            //rebuild color list if it exists
+                            if (return_dataset.backgroundColor && return_dataset.backgroundColor.length) {
+                              var v_color_list = [];
+                              for (var l=0; l<v_return_unit.v_object.labels.length; l++) {
+                                var v_found_label = false;
+                                for (var m=0; m<v_unit.object.data.labels.length; m++) {
+                                  if (JSON.stringify(v_return_unit.v_object.labels[l]) == JSON.stringify(v_unit.object.data.labels[m])) {
+                                    v_color_list.push(dataset.backgroundColor[m]);
+                                    v_found_label = true;
+                                    break;
+                                  }
+                                }
+
+                                if (!v_found_label) {
+                                  v_need_rebuild_legend = true;
+                                  v_color_list.push(return_dataset.backgroundColor[l]);
+                                }
+                              }
+                              new_dataset.backgroundColor=v_color_list;
+                            }
+                            new_dataset.data=return_dataset.data;
+
+                            dataset = new_dataset;
+
+                            v_found = true;
+                            break;
+                          }
+                        };
+                        //dataset doesn't exist, create it
+                        if (!v_found) {
+                          v_need_rebuild_legend = true;
+                          v_unit.object.data.datasets.push(return_dataset);
+                        }
+                      };
+
                       v_unit.object.data.labels = v_return_unit.v_object.labels;
-                      v_unit.object.data.datasets = v_return_unit.v_object.datasets;
+
+                      //update title
+                      if (v_return_unit.v_object.title && v_unit.object.options && v_unit.object.options.title) {
+                        v_unit.object.options.title.text = v_return_unit.v_object.title;
+                      }
+
+
                       try {
                         v_unit.object.update();
+                        if (v_need_rebuild_legend) {
+                          //rebuild labels
+                          var v_legend = v_unit.object.generateLegend();
+                          v_unit.div_label.innerHTML = v_legend;
+                        }
                       }
                       catch (err) {
-
                       }
                     }
                     // Append data
@@ -695,20 +946,6 @@ function refreshMonitorDashboard(p_loading,p_tab_tag,p_div) {
                         dataset.data.push(null);
                         if (v_shift)
                           dataset.data.shift();
-                        /*
-                        var v_found = false;
-                        for (var k=0; k<v_return_unit.v_object.datasets.length; k++) {
-                          var return_dataset = v_return_unit.v_object.datasets[k];
-                          //Dataset exists
-                          if (return_dataset.label == dataset.label) {
-                            v_found = true;
-                            break;
-                          }
-                        };
-                        //dataset doesn't exist, remove it
-                        if (!v_found) {
-                          v_unit.object.data.datasets.splice(j,1);
-                        }*/
                       };
 
                       //foreach dataset in returning data, find corresponding dataset in existing chart
@@ -730,6 +967,7 @@ function refreshMonitorDashboard(p_loading,p_tab_tag,p_div) {
                         };
                         //dataset doesn't exist, create it
                         if (!v_found) {
+                          v_need_rebuild_legend = true;
                           //populate dataset with empty data prior to newest value
                           for (var k=0; k<v_unit.object.data.labels.length-1; k++) {
                             return_dataset.data.unshift(null);
@@ -737,11 +975,21 @@ function refreshMonitorDashboard(p_loading,p_tab_tag,p_div) {
                           v_unit.object.data.datasets.push(return_dataset);
                         }
                       };
+
+                      //update title
+                      if (v_return_unit.v_object.title && v_unit.object.options && v_unit.object.options.title) {
+                        v_unit.object.options.title.text = v_return_unit.v_object.title;
+                      }
+
                       try {
                         v_unit.object.update();
+                        if (v_need_rebuild_legend) {
+                          //rebuild labels
+                          var v_legend = v_unit.object.generateLegend();
+                          v_unit.div_label.innerHTML = v_legend;
+                        }
                       }
                       catch (err) {
-
                       }
                     }
                   }
@@ -760,8 +1008,8 @@ function refreshMonitorDashboard(p_loading,p_tab_tag,p_div) {
 
                     v_unit.div_error.innerHTML = v_return_unit.v_message;
                     v_unit.error = true;
-                    v_unit.object = null;
-                    v_unit.div_content.innerHTML = '';
+                    //v_unit.object = null;
+                    //v_unit.div_content.innerHTML = '';
 
                   }
                   // New grid
@@ -782,6 +1030,7 @@ function refreshMonitorDashboard(p_loading,p_tab_tag,p_div) {
 
         						var v_grid = new Handsontable(v_unit.div_content,
         						{
+                                    licenseKey: 'non-commercial-and-evaluation',
         							data: v_return_unit.v_object.data,
         							columns : columnProperties,
         							colHeaders : true,
@@ -796,10 +1045,15 @@ function refreshMonitorDashboard(p_loading,p_tab_tag,p_div) {
         									if (key === 'view_data') {
         									  	editCellData(this,options[0].start.row,options[0].start.col,this.getDataAtCell(options[0].start.row,options[0].start.col),false);
         									}
-        								},
-        								items: {
-        									"view_data": {name: '<div style=\"position: absolute;\"><img class="img_ht" src=\"/static/OmniDB_app/images/rename.png\"></div><div style=\"padding-left: 30px;\">View Content</div>'}
-        								}
+                          else if (key === 'copy') {
+                            this.selectCell(options[0].start.row,options[0].start.col,options[0].end.row,options[0].end.col);
+                            document.execCommand('copy');
+                          }
+                        },
+                        items: {
+                          "copy": {name: '<div style=\"position: absolute;\"><i class=\"fas fa-copy cm-all\" style=\"vertical-align: middle;\"></i></div><div style=\"padding-left: 30px;\">Copy</div>'},
+                          "view_data": {name: '<div style=\"position: absolute;\"><i class=\"fas fa-edit cm-all\" style=\"vertical-align: middle;\"></i></div><div style=\"padding-left: 30px;\">View Content</div>'}
+                        }
         						    },
         					        cells: function (row, col, prop) {
         							    var cellProperties = {};
@@ -822,6 +1076,127 @@ function refreshMonitorDashboard(p_loading,p_tab_tag,p_div) {
 
                   }
                 }
+
+
+
+                // Graph unit
+                else if (v_return_unit.v_type=='graph') {
+
+                  v_unit.div_error.innerHTML = '';
+                  v_unit.div_details.innerHTML = '';
+
+                  v_unit.div_loading.style.display = 'none';
+
+                  v_return_unit.type='graph';
+
+                  if (v_return_unit.v_error) {
+
+                    v_unit.div_error.innerHTML = v_return_unit.v_message;
+                    v_unit.error = true;
+                    //v_unit.object = null;
+                    //v_unit.div_content.innerHTML = '';
+
+                  }
+                  // New graph
+                  else if (v_unit.object==null) {
+                    v_unit.div_content.classList.add('unit_graph');
+                    v_unit.div_content.innerHTML = '';
+
+                    v_return_unit.v_object.container = v_unit.div_content;
+                    v_unit.object = cytoscape(v_return_unit.v_object);
+                    adjustGraphTheme(v_unit.object);
+                  }
+                  // Existing graph
+                  else {
+
+                    var v_existing_nodes = v_unit.object.nodes()
+                    var v_existing_edges = v_unit.object.edges()
+
+                    var v_new_objects = []
+
+                    //Updating existing nodes and adding new ones
+                    for (var j=0; j<v_return_unit.v_object.nodes.length; j++) {
+                      var v_found_node = false;
+                      var node = v_return_unit.v_object.nodes[j];
+                      for (var k=0; k<v_existing_nodes.length; k++) {
+                        //New node already exists, update data
+                        if (v_existing_nodes[k].data('id') == node.data['id']) {
+                          v_found_node = true;
+                          for (var property in node.data) {
+                              if (node.data.hasOwnProperty(property)) {
+                                  v_existing_nodes[k].data(property,node.data[property])
+                              }
+                          }
+                          break;
+                        }
+                      }
+                      if (!v_found_node) {
+                        node['group'] = 'nodes';
+                        v_new_objects.push(node);
+                      }
+                    }
+
+                    //Updating existing nodes and adding new ones
+                    for (var j=0; j<v_return_unit.v_object.edges.length; j++) {
+                      var v_found_edge = false;
+                      var edge = v_return_unit.v_object.edges[j];
+                      for (var k=0; k<v_existing_edges.length; k++) {
+                        //New edge already exists, update data
+                        if (v_existing_edges[k].data('id') == edge.data['id']) {
+                          v_found_edge = true;
+                          for (var property in edge.data) {
+                              if (edge.data.hasOwnProperty(property)) {
+                                  v_existing_edges[k].data(property,edge.data[property])
+                              }
+                          }
+                          break;
+                        }
+                      }
+                      if (!v_found_edge) {
+                        edge['group'] = 'edges';
+                        v_new_objects.push(edge);
+                      }
+                    }
+                    //Removing edges that doesn't exist anymore
+                    for (var k=0; k<v_existing_edges.length; k++) {
+                      var v_found_edge = false;
+                      for (var j=0; j<v_return_unit.v_object.edges.length; j++) {
+                        var edge = v_return_unit.v_object.edges[j];
+                        if (v_existing_edges[k].data('id') == edge.data['id']) {
+                          v_found_edge = true;
+                          break;
+                        }
+                      }
+                      //Not found, remove it
+                      if (!v_found_edge) {
+                        v_existing_edges[k].remove();
+                      }
+                    }
+                    //Removing nodes that doesn't exist anymore
+                    for (var k=0; k<v_existing_nodes.length; k++) {
+                      var v_found_node = false;
+                      for (var j=0; j<v_return_unit.v_object.nodes.length; j++) {
+                        var node = v_return_unit.v_object.nodes[j];
+                        if (v_existing_nodes[k].data('id') == node.data['id']) {
+                          v_found_node = true;
+                          break;
+                        }
+                      }
+                      //Not found, remove it
+                      if (!v_found_node) {
+                        v_existing_nodes[k].remove();
+                      }
+                    }
+
+                    //Adding new objects and rendering graph again
+                    if (v_new_objects.length > 0) {
+                      v_unit.object.add(v_new_objects);
+                      v_unit.object.layout();
+                    }
+
+
+                  }
+                }
               }
               catch(err) {
                 v_unit.div_error.innerHTML = err;
@@ -838,7 +1213,6 @@ function refreshMonitorDashboard(p_loading,p_tab_tag,p_div) {
                   }
                 })(v_unit.div),v_unit.input_interval.value*1000);
               }
-
             }
   				},
   				function(p_return) {
@@ -867,6 +1241,9 @@ function cancelMonitorUnits(p_tab_tag) {
   for (var i=0; i<v_tab_tag.units.length; i++) {
     var v_unit = v_tab_tag.units[i];
     clearTimeout(v_unit.timeout_object);
+    if (v_unit.type == 'graph' && v_unit.object != null) {
+      v_unit.object.destroy();
+    }
   }
 }
 

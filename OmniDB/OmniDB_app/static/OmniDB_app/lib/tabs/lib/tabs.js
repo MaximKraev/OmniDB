@@ -6,6 +6,19 @@ OmniDB is distributed in the hope that it will be useful, but WITHOUT ANY WARRAN
 You should have received a copy of the GNU General Public License along with OmniDB. If not, see http://www.gnu.org/licenses/.
 */
 
+function composedPath(el) {
+    var path = [];
+    while (el) {
+        path.push(el);
+        if (el.tagName === 'HTML') {
+            path.push(document);
+            path.push(window);
+            return path;
+       }
+       el = el.parentElement;
+    }
+}
+
 function createTabControl(p_div, p_selected_index, p_contextMenu, p_tabColor) {
 
 	// Get an element's exact position
@@ -192,7 +205,7 @@ function createTabControl(p_div, p_selected_index, p_contextMenu, p_tabColor) {
 
 			var v_li = createSimpleElement('li',p_div + '_tab' + v_index,'original');
 
-			var v_img = createImgElement(null,null,'/static/OmniDB_app/images/tab_close.png');
+			var v_img = createSimpleElement('i',null,'fas fa-times tab-icon icon-close');
 
 			v_tab.elementClose = v_img;
 
@@ -253,6 +266,7 @@ function createTabControl(p_div, p_selected_index, p_contextMenu, p_tabColor) {
 					gv_dragSrcTab = v_tabControl.tabList.splice(v_srcIndex, 1)[0];
 
 					gv_dragSrcElement = this;
+					e.dataTransfer.setData('Text', '');
 					var v_parentElement = gv_dragSrcElement.parentElement;
 
 					setTimeout(function() {//Used because of bug in chrome during dragstart
@@ -271,7 +285,8 @@ function createTabControl(p_div, p_selected_index, p_contextMenu, p_tabColor) {
 				}
 
 				function handleDragOver(e) {
-					if(e.path.length == 0) {
+					var path = composedPath(gv_dragSrcElement);
+					if(path.length == 0) {
 						return false;
 					}
 
@@ -281,13 +296,13 @@ function createTabControl(p_div, p_selected_index, p_contextMenu, p_tabColor) {
 
 					var v_found = false;
 					var v_overElement;
-					for(var i = 0; i < e.path.length && !v_found; i++) {
-						if(typeof e.path[i].classList != 'undefined' && e.path[i].classList != null && e.path[i].classList.length != 0) {
-							for(var j = 0; j < e.path[i].classList.length && !v_found; j++) {
-								if(e.path[i].classList[j] == 'original') {
-									if(e.path[i].parentElement.parentElement.id == gv_dragSrcElement.parentElement.parentElement.id) {
+					for(var i = 0; i < path.length && !v_found; i++) {
+						if(typeof path[i].classList != 'undefined' && path[i].classList != null && path[i].classList.length != 0) {
+							for(var j = 0; j < path[i].classList.length && !v_found; j++) {
+								if(path[i].classList[j] == 'original') {
+									if(path[i].parentElement.parentElement.id == gv_dragSrcElement.parentElement.parentElement.id) {
 										v_found = true;
-										v_overElement = e.path[i];
+										v_overElement = path[i];
 									}
 								}
 							}
@@ -462,7 +477,7 @@ function createTabControl(p_div, p_selected_index, p_contextMenu, p_tabColor) {
 						if (v_menu.elements[i].submenu!=undefined) {
 							v_li.appendChild(v_ul);
 							var v_span_more = createSimpleElement('div',null,null);
-							v_span_more.appendChild(createImgElement(null,'menu_img','/static/OmniDB_app/images/right.png'));
+							v_span_more.appendChild(createImgElement(null,'menu_img',v_url_folder + '/static/OmniDB_app/images/right.png'));
 							v_li.appendChild(v_span_more);
 							v_tree.contextMenuLi(v_menu.elements[i].submenu,v_ul,p_tag,v_closediv);
 						}
@@ -510,7 +525,7 @@ function createTabControl(p_div, p_selected_index, p_contextMenu, p_tabColor) {
 				if (p_submenu.elements[i].p_submenu!=undefined) {
 					v_li.appendChild(v_ul);
 					var v_span_more = createSimpleElement('div',null,null);
-					v_span_more.appendChild(createImgElement(null,'menu_img','/static/OmniDB_app/images/right.png'));
+					v_span_more.appendChild(createImgElement(null,'menu_img',v_url_folder + '/static/OmniDB_app/images/right.png'));
 					v_li.appendChild(v_span_more);
 					v_tree.contextMenuLi(p_submenu.elements[i].p_submenu,v_ul,p_tag,p_closediv);
 				}

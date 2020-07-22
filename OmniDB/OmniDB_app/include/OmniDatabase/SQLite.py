@@ -1,8 +1,8 @@
 '''
 The MIT License (MIT)
 
-Portions Copyright (c) 2015-2018, The OmniDB Team
-Portions Copyright (c) 2017-2018, 2ndQuadrant Limited
+Portions Copyright (c) 2015-2019, The OmniDB Team
+Portions Copyright (c) 2017-2019, 2ndQuadrant Limited
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -54,6 +54,7 @@ class SQLite:
     def __init__(self, p_service, p_conn_id=0, p_alias='', p_foreignkeys=True):
         self.v_alias = p_alias
         self.v_db_type = 'sqlite'
+        self.v_conn_string = ''
         self.v_conn_id = p_conn_id
         self.v_server = ''
         self.v_port = ''
@@ -107,7 +108,9 @@ class SQLite:
 			"SET DEFAULT",
 			"CASCADE"
         ]
+        self.v_reserved_words = []
         self.v_console_help = "Console tab."
+        self.v_use_server_cursor = False
 
     def GetName(self):
         return self.v_service

@@ -1,9 +1,12 @@
 from django.conf.urls import url
+from django.urls import include, path
 from . import views
 from django.conf import settings
 from django.conf.urls.static import static
 
-urlpatterns = [
+base_urlpatterns = [
+    url(r'^upload/$', views.plugins.upload_view, name='sign_in'),
+
     #LOGIN
     url(r'^$', views.login.index, name='login'),
     url(r'^login/', views.login.index, name='login'),
@@ -17,6 +20,10 @@ urlpatterns = [
     url(r'^save_connections/$', views.connections.save_connections, name='save_connections'),
     url(r'^test_connection/$', views.connections.test_connection, name='test_connection'),
     url(r'^select_connection/$', views.connections.select_connection, name='select_connection'),
+    url(r'^get_groups/$', views.connections.get_groups, name='get_groups'),
+    url(r'^new_group/$', views.connections.new_group, name='new_group'),
+    url(r'^edit_group/$', views.connections.edit_group, name='edit_group'),
+    url(r'^delete_group/$', views.connections.delete_group, name='delete_group'),
 
     #USERS
     url(r'^get_users/$', views.users.get_users, name='get_users'),
@@ -41,8 +48,8 @@ urlpatterns = [
 
     #WORKSPACE
     url(r'^workspace/', views.workspace.index, name='workspace'),
-    url(r'^welcome/', views.workspace.welcome, name='welcome'),
     url(r'^shortcuts/', views.workspace.shortcuts, name='shortcuts'),
+    url(r'^close_welcome/', views.workspace.close_welcome, name='close_welcome'),
     url(r'^save_config_user/', views.workspace.save_config_user, name='save_config_user'),
     url(r'^save_shortcuts/', views.workspace.save_shortcuts, name='save_shortcuts'),
     url(r'^get_database_list/', views.workspace.get_database_list, name='get_database_list'),
@@ -59,6 +66,8 @@ urlpatterns = [
     url(r'^refresh_monitoring/', views.workspace.refresh_monitoring, name='refresh_monitoring'),
     url(r'^get_console_history/', views.workspace.get_console_history, name='get_console_history'),
     url(r'^get_console_history_clean/', views.workspace.get_console_history_clean, name='get_console_history_clean'),
+    url(r'^get_autocomplete_results/', views.workspace.get_autocomplete_results, name='get_autocomplete_results'),
+    url(r'^delete_plugin/', views.plugins.delete_plugin, name='delete_plugin'),
 
     #HOOKS
     url(r'^get_plugins/', views.plugins.get_plugins, name='get_plugins'),
@@ -73,21 +82,6 @@ urlpatterns = [
     url(r'^delete_node_snippet/', views.tree_snippets.delete_node_snippet, name='delete_node_snippet'),
     url(r'^save_snippet_text/', views.tree_snippets.save_snippet_text, name='save_snippet_text'),
     url(r'^rename_node_snippet/', views.tree_snippets.rename_node_snippet, name='rename_node_snippet'),
-
-    #TREE
-    #url(r'^get_tree_info/', views.tree.get_tree_info, name='get_tree_info'),
-    #url(r'^get_tables/', views.tree.get_tables, name='get_tables'),
-    #url(r'^get_columns/', views.tree.get_columns, name='get_columns'),
-    #url(r'^get_pk/', views.tree.get_pk, name='get_pk'),
-    #url(r'^get_fks/', views.tree.get_fks, name='get_fks'),
-    #url(r'^get_uniques/', views.tree.get_uniques, name='get_uniques'),
-    #url(r'^get_indexes/', views.tree.get_indexes, name='get_indexes'),
-    #url(r'^get_functions/', views.tree.get_functions, name='get_functions'),
-    #url(r'^get_function_fields/', views.tree.get_function_fields, name='get_function_fields'),
-    #url(r'^get_function_definition/', views.tree.get_function_definition, name='get_function_definition'),
-    #url(r'^get_procedures/', views.tree.get_procedures, name='get_procedures'),
-    #url(r'^get_procedure_fields/', views.tree.get_procedure_fields, name='get_procedure_fields'),
-    #url(r'^get_procedure_definition/', views.tree.get_procedure_definition, name='get_procedure_definition'),
 
     #TREE_POSTGRESQL
     url(r'^get_tree_info_postgresql/', views.tree_postgresql.get_tree_info, name='get_tree_info'),
@@ -107,14 +101,25 @@ urlpatterns = [
     url(r'^get_rules_postgresql/', views.tree_postgresql.get_rules, name='get_rules'),
     url(r'^get_rule_definition_postgresql/', views.tree_postgresql.get_rule_definition, name='get_rule_definition'),
     url(r'^get_triggers_postgresql/', views.tree_postgresql.get_triggers, name='get_triggers'),
+    url(r'^get_eventtriggers_postgresql/', views.tree_postgresql.get_eventtriggers, name='get_eventtriggers'),
     url(r'^get_inheriteds_postgresql/', views.tree_postgresql.get_inheriteds, name='get_inheriteds'),
+    url(r'^get_inheriteds_parents_postgresql/', views.tree_postgresql.get_inheriteds_parents, name='get_inheriteds_parents'),
+    url(r'^get_inheriteds_children_postgresql/', views.tree_postgresql.get_inheriteds_children, name='get_inheriteds_children'),
     url(r'^get_partitions_postgresql/', views.tree_postgresql.get_partitions, name='get_partitions'),
+    url(r'^get_partitions_parents_postgresql/', views.tree_postgresql.get_partitions_parents, name='get_partitions_parents'),
+    url(r'^get_partitions_children_postgresql/', views.tree_postgresql.get_partitions_children, name='get_partitions_children'),
     url(r'^get_functions_postgresql/', views.tree_postgresql.get_functions, name='get_functions'),
     url(r'^get_function_fields_postgresql/', views.tree_postgresql.get_function_fields, name='get_function_fields'),
     url(r'^get_function_definition_postgresql/', views.tree_postgresql.get_function_definition, name='get_function_definition'),
     url(r'^get_function_debug_postgresql/', views.tree_postgresql.get_function_debug, name='get_function_debug'),
+    url(r'^get_procedures_postgresql/', views.tree_postgresql.get_procedures, name='get_procedures'),
+    url(r'^get_procedure_fields_postgresql/', views.tree_postgresql.get_procedure_fields, name='get_procedure_fields'),
+    url(r'^get_procedure_definition_postgresql/', views.tree_postgresql.get_procedure_definition, name='get_procedure_definition'),
+    url(r'^get_procedure_debug_postgresql/', views.tree_postgresql.get_procedure_debug, name='get_procedure_debug'),
     url(r'^get_triggerfunctions_postgresql/', views.tree_postgresql.get_triggerfunctions, name='get_triggerfunctions'),
     url(r'^get_triggerfunction_definition_postgresql/', views.tree_postgresql.get_triggerfunction_definition, name='get_triggerfunction_definition'),
+    url(r'^get_eventtriggerfunctions_postgresql/', views.tree_postgresql.get_eventtriggerfunctions, name='get_eventtriggerfunctions'),
+    url(r'^get_eventtriggerfunction_definition_postgresql/', views.tree_postgresql.get_eventtriggerfunction_definition, name='get_eventtriggerfunction_definition'),
     url(r'^get_sequences_postgresql/', views.tree_postgresql.get_sequences, name='get_sequences'),
     url(r'^get_views_postgresql/', views.tree_postgresql.get_views, name='get_views'),
     url(r'^get_views_columns_postgresql/', views.tree_postgresql.get_views_columns, name='get_views_columns'),
@@ -137,31 +142,18 @@ urlpatterns = [
     url(r'^get_user_mappings_postgresql/', views.tree_postgresql.get_user_mappings, name='get_user_mappings'),
     url(r'^get_foreign_tables_postgresql/', views.tree_postgresql.get_foreign_tables, name='get_foreign_tables'),
     url(r'^get_foreign_columns_postgresql/', views.tree_postgresql.get_foreign_columns, name='get_foreign_columns'),
+    url(r'^get_types_postgresql/', views.tree_postgresql.get_types, name='get_types'),
+    url(r'^get_domains_postgresql/', views.tree_postgresql.get_domains, name='get_domains'),
     url(r'^kill_backend_postgresql/', views.tree_postgresql.kill_backend, name='kill_backend'),
-    url(r'^get_pglogical_nodes_postgresql/', views.tree_postgresql.get_pglogical_nodes, name='get_pglogical_nodes'),
-    url(r'^get_pglogical_interfaces_postgresql/', views.tree_postgresql.get_pglogical_interfaces, name='get_pglogical_interfaces'),
-    url(r'^get_pglogical_replicationsets_postgresql/', views.tree_postgresql.get_pglogical_replicationsets, name='get_pglogical_replicationsets'),
-    url(r'^get_pglogical_repset_tables_postgresql/', views.tree_postgresql.get_pglogical_repset_tables, name='get_pglogical_repset_tables'),
-    url(r'^get_pglogical_repset_seqs_postgresql/', views.tree_postgresql.get_pglogical_repset_seqs, name='get_pglogical_repset_seqs'),
-    url(r'^get_pglogical_subscriptions_postgresql/', views.tree_postgresql.get_pglogical_subscriptions, name='get_pglogical_subscriptions'),
-    url(r'^get_pglogical_subscription_repsets_postgresql/', views.tree_postgresql.get_pglogical_subscription_repsets, name='get_pglogical_subscription_repsets'),
-    url(r'^get_bdr_properties_postgresql/', views.tree_postgresql.get_bdr_properties, name='get_bdr_properties'),
-    url(r'^get_bdr_nodes_postgresql/', views.tree_postgresql.get_bdr_nodes, name='get_bdr_nodes'),
-    url(r'^get_bdr_replicationsets_postgresql/', views.tree_postgresql.get_bdr_replicationsets, name='get_bdr_replicationsets'),
-    url(r'^get_bdr_table_replicationsets_postgresql/', views.tree_postgresql.get_bdr_table_replicationsets, name='get_bdr_table_replicationsets'),
-    url(r'^get_bdr_table_conflicthandlers_postgresql/', views.tree_postgresql.get_bdr_table_conflicthandlers, name='get_bdr_table_conflicthandlers'),
-    url(r'^get_bdr_groups_postgresql/', views.tree_postgresql.get_bdr_groups, name='get_bdr_groups'),
-    url(r'^get_xl_nodes_postgresql/', views.tree_postgresql.get_xl_nodes, name='get_xl_nodes'),
-    url(r'^get_xl_groups_postgresql/', views.tree_postgresql.get_xl_groups, name='get_xl_groups'),
-    url(r'^get_xl_group_nodes_postgresql/', views.tree_postgresql.get_xl_group_nodes, name='get_xl_group_nodes'),
-    url(r'^get_xl_table_properties_postgresql/', views.tree_postgresql.get_xl_table_properties, name='get_xl_table_properties'),
-    url(r'^get_xl_table_nodes_postgresql/', views.tree_postgresql.get_xl_table_nodes, name='get_xl_table_nodes'),
     url(r'^get_properties_postgresql/', views.tree_postgresql.get_properties, name='get_properties'),
     url(r'^get_database_objects_postgresql/', views.tree_postgresql.get_database_objects, name='get_database_objects'),
     url(r'^template_select_postgresql/', views.tree_postgresql.template_select, name='template_select'),
     url(r'^template_insert_postgresql/', views.tree_postgresql.template_insert, name='template_insert'),
     url(r'^template_update_postgresql/', views.tree_postgresql.template_update, name='template_update'),
+    url(r'^template_select_function_postgresql/', views.tree_postgresql.template_select_function, name='template_select_function'),
+    url(r'^template_call_procedure_postgresql/', views.tree_postgresql.template_call_procedure, name='template_call_procedure'),
     url(r'^change_active_database/', views.workspace.change_active_database, name='change_active_database'),
+    url(r'^get_postgresql_version/', views.tree_postgresql.get_version, name='get_version'),
 
     #TREE_ORACLE
     url(r'^get_tree_info_oracle/', views.tree_oracle.get_tree_info, name='get_tree_info'),
@@ -259,7 +251,7 @@ urlpatterns = [
     #url(r'^get_function_debug_mariadb/', views.tree_mariadb.get_function_debug, name='get_function_debug'),
     #url(r'^get_triggerfunctions_mariadb/', views.tree_mariadb.get_triggerfunctions, name='get_triggerfunctions'),
     #url(r'^get_triggerfunction_definition_mariadb/', views.tree_mariadb.get_triggerfunction_definition, name='get_triggerfunction_definition'),
-    #url(r'^get_sequences_mariadb/', views.tree_mariadb.get_sequences, name='get_sequences'),
+    url(r'^get_sequences_mariadb/', views.tree_mariadb.get_sequences, name='get_sequences'),
     url(r'^get_views_mariadb/', views.tree_mariadb.get_views, name='get_views'),
     url(r'^get_views_columns_mariadb/', views.tree_mariadb.get_views_columns, name='get_views_columns'),
     url(r'^get_view_definition_mariadb/', views.tree_mariadb.get_view_definition, name='get_view_definition'),
@@ -285,3 +277,13 @@ urlpatterns = [
     url(r'^update_saved_monitor_unit_interval/', views.monitor_dashboard.update_saved_monitor_unit_interval, name='update_saved_monitor_unit_interval'),
 
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+if settings.PATH == '':
+    v_url = ''
+else:
+    v_url = settings.PATH[1:] + '/'
+
+urlpatterns = [# if you wish to maintain the un-prefixed URL's too
+    url(v_url, include(base_urlpatterns)),
+    #url(r'^subfolder/', include(base_urlpatterns))
+]

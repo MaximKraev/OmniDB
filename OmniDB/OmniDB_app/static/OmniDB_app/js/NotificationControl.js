@@ -1,13 +1,26 @@
 /*
-Copyright 2015-2017 The OmniDB Team
+The MIT License (MIT)
 
-This file is part of OmniDB.
+Portions Copyright (c) 2015-2019, The OmniDB Team
+Portions Copyright (c) 2017-2019, 2ndQuadrant Limited
 
-OmniDB is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-OmniDB is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-You should have received a copy of the GNU General Public License along with OmniDB. If not, see http://www.gnu.org/licenses/.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 */
 
 function checkSessionMessage() {
@@ -25,11 +38,11 @@ function checkSessionMessage() {
 
 function showError(p_message) {
 	document.getElementById('div_error_msg').innerHTML = '<img src="/static/OmniDB_app/images/error.png"/ style="display: block; margin-left: auto; margin-right: auto;"><br/>' + p_message;
-	$('#div_error').show();
+	$('#div_error').addClass('isActive');
 }
 
 function hideError() {
-	$('#div_error').hide();
+	$('#div_error').removeClass('isActive');
 	document.getElementById('div_error_msg').innerHTML = '';
 }
 
@@ -47,7 +60,7 @@ function showAlert(p_info, p_funcYes = null)
 	v_button.innerHTML = 'Ok';
 	v_button.onclick = function() {
 		document.getElementById('div_alert_content').innerHTML = '';
-		$('#div_alert').hide();
+		$('#div_alert').removeClass('isActive');
 		if (p_funcYes!=null)
 			p_funcYes();
 	};
@@ -59,7 +72,7 @@ function showAlert(p_info, p_funcYes = null)
 	document.getElementById('div_alert_content').appendChild(v_div_text);
 	document.getElementById('div_alert_content').appendChild(v_div_buttons);
 
-	$('#div_alert').show();
+	$('#div_alert').addClass('isActive');
 
 	v_button.focus();
 }
@@ -67,11 +80,11 @@ function showAlert(p_info, p_funcYes = null)
 
 function clickConfirmCancel() {
 
-        $('#div_alert').hide();
+        $('#div_alert').removeClass('isActive');
 
 }
 
-function showConfirm(p_info,p_funcYes)
+function showConfirm(p_info,p_funcYes,p_funcNo)
 {
 	var v_div_text = document.createElement('div');
 	v_div_text.className = 'div_alert_text';
@@ -81,6 +94,7 @@ function showConfirm(p_info,p_funcYes)
 	v_div_buttons.className = 'div_alert_buttons';
 
 	var v_button_ok = document.createElement('button');
+	v_button_ok.id = 'button_confirm_ok';
 	v_button_ok.innerHTML = 'Ok';
 	v_button_ok.onclick = function() {
 		clickConfirmCancel();
@@ -89,9 +103,12 @@ function showConfirm(p_info,p_funcYes)
 	v_div_buttons.appendChild(v_button_ok);
 
 	var v_button_cancel = document.createElement('button');
+	v_button_cancel.id = 'button_confirm_cancel';
 	v_button_cancel.innerHTML = 'Cancel';
 	v_button_cancel.onclick = function() {
 		clickConfirmCancel();
+		if (p_funcNo)
+			p_funcNo();
 	};
 	v_div_buttons.appendChild(v_button_cancel);
 
@@ -100,7 +117,7 @@ function showConfirm(p_info,p_funcYes)
 	document.getElementById('div_alert_content').appendChild(v_div_text);
 	document.getElementById('div_alert_content').appendChild(v_div_buttons);
 
-	$('#div_alert').show();
+	$('#div_alert').addClass('isActive');
 
 	v_button_ok.focus();
 
@@ -144,7 +161,7 @@ function showConfirm2(p_info,p_funcYes,p_funcNo)
 	document.getElementById('div_alert_content').appendChild(v_div_text);
 	document.getElementById('div_alert_content').appendChild(v_div_buttons);
 
-	$('#div_alert').show();
+	$('#div_alert').addClass('isActive');
 
 }
 
@@ -179,6 +196,6 @@ function showConfirm3(p_info,p_funcYes,p_funcNo)
 	document.getElementById('div_alert_content').appendChild(v_div_text);
 	document.getElementById('div_alert_content').appendChild(v_div_buttons);
 
-	$('#div_alert').show();
+	$('#div_alert').addClass('isActive');
 
 }

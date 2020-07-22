@@ -1,13 +1,26 @@
 /*
-Copyright 2015-2017 The OmniDB Team
+The MIT License (MIT)
 
-This file is part of OmniDB.
+Portions Copyright (c) 2015-2019, The OmniDB Team
+Portions Copyright (c) 2017-2019, 2ndQuadrant Limited
 
-OmniDB is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-OmniDB is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-You should have received a copy of the GNU General Public License along with OmniDB. If not, see http://www.gnu.org/licenses/.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 */
 
 /*
@@ -113,12 +126,12 @@ You should have received a copy of the GNU General Public License along with Omn
   - **DESCRIPTION**: Gets the tag of the selected external tab, allowing to store information there.
   - **RETURNS**: Selected external tab tag.
 
-- ```createSQLTab({ p_name: '', p_template: '', p_show_qtip: true })```
+- ```createSQLTab({ p_name: '', p_template: '', p_show_tip: true })```
   - **DESCRIPTION**: Creates an internal Query Tab with a specific SQL passed as a parameter.
   - **PARAMETERS**:
     - p_name: the name of the tab.
     - p_template: the SQL to be filled in the editor.
-    - p_show_qtip: whether to show a tip with the message "Adjust command and run!"
+    - p_show_tip: whether to show a tip with the message "Adjust command and run!"
 
 - ```getPluginPath(p_plugin_name)```
   - **DESCRIPTION**: Get the path of the specific plugin to use reference static files.
@@ -180,10 +193,21 @@ $(function () {
 			function(p_return) {
         var timestamp = new Date().getTime();
         for (var i=0; i<p_return.v_data.length; i++) {
-          var imported = document.createElement('script');
-          imported.src = p_return.v_data[i].file + '?v' + timestamp;
-          document.head.appendChild(imported);
-          v_plugins[p_return.v_data[i].name] = p_return.v_data[i]
+
+          // loading CSS
+          if (p_return.v_data[i].cssfile) {
+            var importedcss = document.createElement('link');
+            importedcss.rel = 'stylesheet';
+            importedcss.href = v_url_folder + p_return.v_data[i].cssfile + '?v' + timestamp;
+            document.head.appendChild(importedcss);
+          }
+
+          // loading JS
+          var importedjs = document.createElement('script');
+          importedjs.src = v_url_folder + p_return.v_data[i].file + '?v' + timestamp;
+          document.head.appendChild(importedjs);
+
+          v_plugins[p_return.v_data[i].name] = p_return.v_data[i];
         }
 
 			},
@@ -191,6 +215,44 @@ $(function () {
 			'box');
 
 });
+
+var csrftoken = getCookie('omnidb_csrftoken');
+
+function upload(p_file_selector) {
+
+var formData = new FormData();
+formData.append('file', p_file_selector.files[0]);
+p_file_selector.value = null;
+startLoading();
+$.ajax({
+    url: v_url_folder + '/upload/',
+    type: 'POST',
+		beforeSend: function(xhr, settings) {
+			if(!csrfSafeMethod(settings.type) && !this.crossDomain) {
+				xhr.setRequestHeader("X-CSRFToken", csrftoken);
+			}
+		},
+    data: formData,
+    cache: false,
+    processData: false,
+    contentType: false,
+    success: function(data) {
+        if (!data.v_error) {
+          showAlert('Plugin successfully installed, please restart OmniDB.');
+          showPlugins();
+        }
+        else
+        {
+          showError(data.v_message);
+        }
+        endLoading();
+    },
+    error: function(msg) {
+			endLoading();
+		}
+});
+return false;
+}
 
 function activateHook(p_hook,p_function) {
   try {
@@ -230,14 +292,28 @@ function getPluginPath(p_name) {
 }
 
 function hidePlugins() {
-  document.getElementById('div_plugins').style.display = 'none';
+  document.getElementById('div_plugins').classList.remove('isActive');
   v_connTabControl.tag.plugin_ht.destroy();
   v_connTabControl.tag.plugin_ht = null;
 }
 
+function deletePlugin(p_plugin_name,p_plugin_folder) {
+  showConfirm('Are you sure you want to delete the following plugin? You will have to restart OmniDB after this operation.',
+  function() {
+    execAjax('/delete_plugin/',
+  			JSON.stringify({'p_plugin_name': p_plugin_name, "p_plugin_folder": p_plugin_folder}),
+  			function(p_return) {
+          showAlert(p_return.v_data);
+          showPlugins();
+        },
+        null,
+        'box');
+  })
+}
+
 function showPlugins() {
 
-  document.getElementById('div_plugins').style.display = 'block';
+  document.getElementById('div_plugins').classList.add('isActive');
 
 	execAjax('/list_plugins/',
 			JSON.stringify({}),
@@ -249,13 +325,13 @@ function showPlugins() {
 
 				var col = new Object();
 				col.title =  'Folder';
-				col.width = '120';
+				col.width = '80';
         col.readOnly = true;
 				columnProperties.push(col);
 
 				var col = new Object();
 				col.title =  'Plugin Name';
-        col.width = '120';
+        col.width = '100';
         col.readOnly = true;
 				columnProperties.push(col);
 
@@ -267,7 +343,7 @@ function showPlugins() {
 
 				var col = new Object();
 				col.title =  'Config file';
-        col.width = '80';
+        col.width = '70';
         col.readOnly = true;
 				columnProperties.push(col);
 
@@ -284,12 +360,25 @@ function showPlugins() {
 				columnProperties.push(col);
 
         var col = new Object();
-				col.title =  'Enabled';
+				col.title =  'CSS File';
+        col.width = '60';
+        col.readOnly = true;
+				columnProperties.push(col);
+
+        var col = new Object();
+				col.title =  'Status';
+        col.width = '50';
+        col.readOnly = true;
+				columnProperties.push(col);
+
+        var col = new Object();
+				col.title =  'Actions';
         col.width = '50';
         col.readOnly = true;
 				columnProperties.push(col);
 
 				var v_div_result = document.getElementById('plugin_grid');
+        v_connTabControl.tag.plugin_message_list = p_return.v_data.message;
 
 				if (v_div_result.innerHTML!='') {
 					v_connTabControl.tag.plugin_ht.destroy();
@@ -297,7 +386,8 @@ function showPlugins() {
 
 				v_connTabControl.tag.plugin_ht = new Handsontable(v_div_result,
 														{
-															data: p_return.v_data,
+                                                            licenseKey: 'non-commercial-and-evaluation',
+															data: p_return.v_data.list,
 															columns : columnProperties,
 															colHeaders : true,
 															manualColumnResize: true,
@@ -317,6 +407,12 @@ function showPlugins() {
 				},
 				null,
 				'box');
+}
+
+function getPluginMessage() {
+  var v_row = v_connTabControl.tag.plugin_ht.getSelected()[0][0];
+  if (v_connTabControl.tag.plugin_message_list[v_row]!='')
+    showError(v_connTabControl.tag.plugin_message_list[v_row])
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -354,14 +450,14 @@ function callPluginFunction({ p_plugin_name, p_function_name, p_data = null, p_c
       p_loading);
 }
 
-function createSQLTab({ p_name = '', p_template = '', p_show_qtip = true }) {
-  tabSQLTemplate(p_name, p_template, p_show_qtip);
+function createSQLTab({ p_name = '', p_template = '', p_show_tip = true }) {
+  tabSQLTemplate(p_name, p_template, p_show_tip);
 }
 
 function createInnerTab({ p_name = '', p_image = '', p_select_function = null, p_before_close_function = null }) {
   v_connTabControl.selectedTab.tag.tabControl.removeTabIndex(v_connTabControl.selectedTab.tag.tabControl.tabList.length-1);
   var v_tab = v_connTabControl.selectedTab.tag.tabControl.createTab(
-    '<img src="' + p_image + '"/><span id="tab_title"> ' + p_name + '</span><span title="Close" id="tab_close"><img src="/static/OmniDB_app/images/tab_close.png"/></span>',
+    '<i class="' + p_image + ' icon-tab-title"></i><span id="tab_title"> ' + p_name + '</span><i title="Close" id="tab_close" class="fas fa-times tab-icon icon-close"></i>',
     false,
     null,
     null,
@@ -409,7 +505,7 @@ function getSelectedOuterTabTag() {
 function createOuterTab({ p_name = '', p_image = '', p_select_function = null, p_before_close_function = null }) {
   v_connTabControl.removeTabIndex(v_connTabControl.tabList.length-1);
   var v_tab = v_connTabControl.createTab(
-    '<img src="' + p_image + '"/><span id="tab_title"> ' + p_name + '</span><span title="Close" id="tab_close"><img src="/static/OmniDB_app/images/tab_close.png"/></span>',
+    '<i class="' + p_image + ' icon-tab-title"></i><span id="tab_title"> ' + p_name + '</span><i title="Close" id="tab_close" class="fas fa-times tab-icon icon-close"></i>',
     false,
     null,
     null,

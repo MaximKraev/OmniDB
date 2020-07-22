@@ -1,13 +1,26 @@
 /*
-Copyright 2015-2017 The OmniDB Team
+The MIT License (MIT)
 
-This file is part of OmniDB.
+Portions Copyright (c) 2015-2019, The OmniDB Team
+Portions Copyright (c) 2017-2019, 2ndQuadrant Limited
 
-OmniDB is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-OmniDB is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-You should have received a copy of the GNU General Public License along with OmniDB. If not, see http://www.gnu.org/licenses/.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 */
 
 /// <summary>
@@ -23,8 +36,10 @@ var v_queryRequestCodes = {
 	CancelThread: 6,
 	Debug: 7,
 	CloseTab: 8,
-	DataMining: 9,
-	Console: 10
+	AdvancedObjectSearch: 9,
+	Console: 10,
+	Terminal: 11,
+	Ping: 12
 }
 
 /// <summary>
@@ -41,9 +56,22 @@ var v_queryResponseCodes = {
 	MessageException: 7,
 	DebugResponse: 8,
 	RemoveContext: 9,
-	DataMiningResult: 10,
-	ConsoleResult: 11
+	AdvancedObjectSearchResult: 10,
+	ConsoleResult: 11,
+	TerminalResult: 12,
+	Pong: 13
 }
+
+//If client is connected or not
+var v_client_connected = false;
+
+//Tooltip object and timer
+var v_client_tooltip = null;
+var v_client_tooltip_timer = null;
+
+//Ping timer
+var v_client_ping_timer = null;
+var v_client_ping_response_timer = null;
 
 /// <summary>
 /// The variable that will receive the WebSocket object.
@@ -68,11 +96,39 @@ function setStatusIcon(p_mode) {
 		v_ws_online.style.display = '';
 }
 
+//
+function websocketPing() {
+	v_client_ping_timer = setTimeout( function() {
+		sendWebSocketMessage(v_queryWebSocket, v_queryRequestCodes.Ping, null, false);
+		v_client_ping_response_timer = setTimeout(function() {
+			try {
+				v_queryWebSocket.close();
+			}
+			catch {
+
+			}
+			websocketClosed();
+		},20000);
+	},120000);
+
+}
+
+function websocketPong() {
+	clearTimeout(v_client_ping_timer);
+	clearTimeout(v_client_ping_response_timer);
+	websocketPing();
+
+}
+
 /// <summary>
 /// Starts query client
 /// </summary>
 /// <param name="p_port">Port where chat will listen for connections.</param>
 function startQueryWebSocket(p_port) {
+
+	clearTimeout(v_client_ping_timer);
+	clearTimeout(v_client_ping_response_timer);
+
 
 	setStatusIcon(1);
 
@@ -102,11 +158,30 @@ function startQueryWebSocket(p_port) {
 		function(p_event) {//Open
 			sendWebSocketMessage(v_queryWebSocket, v_queryRequestCodes.Login, v_user_key, false);
 			setStatusIcon(2);
+			websocketPing();
+			v_client_connected = true;
+
+			if (v_client_tooltip!=null) {
+				v_client_tooltip.dispose();
+				v_client_tooltip = new Tooltip($('#tooltip_status'),{
+					title: 'Reconnected.',
+					placement: "bottom",
+				});
+				v_client_tooltip.show();
+				v_client_tooltip_timer = window.setTimeout(function() {
+						v_client_tooltip.dispose();
+				}, 4000);
+			}
+
 		},
 		function(p_message, p_context, p_context_code) {//Message
 			var v_message = p_message;
 
 			switch(v_message.v_code) {
+				case parseInt(v_queryResponseCodes.Pong): {
+					websocketPong();
+					break;
+				}
 				case parseInt(v_queryResponseCodes.SessionMissing): {
 					showAlert('Session not found please reload the page.');
 					break;
@@ -158,6 +233,12 @@ function startQueryWebSocket(p_port) {
 					}
 					break;
 				}
+				case parseInt(v_queryResponseCodes.TerminalResult): {
+					if (p_context) {
+						terminalReturn(v_message,p_context);
+					}
+					break;
+				}
 				case parseInt(v_queryResponseCodes.QueryEditDataResult): {
 					if (p_context) {
 						SetAcked(p_context);
@@ -192,10 +273,10 @@ function startQueryWebSocket(p_port) {
 				default: {
 					break;
 				}
-				case parseInt(v_queryResponseCodes.DataMiningResult): {
+				case parseInt(v_queryResponseCodes.AdvancedObjectSearchResult): {
 					if (p_context) {
 						SetAcked(p_context);
-						dataMiningReturn(v_message, p_context);
+						advancedObjectSearchReturn(v_message, p_context);
 						//Remove context
 						removeContext(v_queryWebSocket,p_context_code);
 					}
@@ -204,29 +285,59 @@ function startQueryWebSocket(p_port) {
 			}
 		},
 		function(p_event) {//Close
-			//showError('The connection with query server was closed.<br>WebSocket error code: ' + p_event.code + '.<br>Reconnected.');
-			//startQueryWebSocket(p_port);
 
-			setStatusIcon(0);
-
-			if (!p_port) {
-				startQueryWebSocket(v_query_port);
-			}
-			else {
-				showAlert(
-					'Cannot connect to websocket server with ports ' + v_query_port_external + ' (external) and ' + v_query_port + ' (internal). Trying again in 5 seconds...'
-				,function() {
-					setTimeout(function() {
-						startQueryWebSocket();
-					},5000);
-				})
-			}
+			websocketClosed(p_port);
 		},
 		function(p_event) {//Error
 			//showError('An error has occurred during the communication with the query server.');
 		},
 		v_channel
 	);
+
+}
+
+function websocketClosed(p_port) {
+
+	setStatusIcon(0);
+
+	if (p_port==null && !v_client_connected) {
+		startQueryWebSocket(v_query_port);
+	}
+	else if (v_client_connected) {
+		v_client_connected = false;
+		startQueryWebSocket();
+
+		if (v_client_tooltip!=null) {
+			if (v_client_tooltip_timer!=null) {
+				clearTimeout(v_client_tooltip_timer);
+				v_client_tooltip_timer = null;
+			}
+			v_client_tooltip.dispose();
+		}
+
+		v_client_tooltip = new Tooltip($('#tooltip_status'),{
+			title: 'Lost connection to server, reconnecting...',
+			placement: "bottom",
+		});
+		v_client_tooltip.show();
+	}
+	else {
+		if (v_client_tooltip!=null) {
+			if (v_client_tooltip_timer!=null) {
+				clearTimeout(v_client_tooltip_timer);
+				v_client_tooltip_timer = null;
+			}
+			v_client_tooltip.dispose();
+		}
+
+		showAlert(
+			'Cannot connect to websocket server with ports ' + v_query_port_external + ' (external) and ' + v_query_port + ' (internal). Trying again in 2 seconds...'
+		,function() {
+			setTimeout(function() {
+				startQueryWebSocket();
+			},2000);
+		})
+	}
 
 }
 
@@ -242,6 +353,15 @@ function QueryPasswordRequired(p_context, p_message) {
 			function() {
 				cancelSQLTab(p_context.tab_tag);
 				//querySQL(p_context.mode);
+				querySQL(p_context.mode,
+								 p_context.all_data,
+								 p_context.query,
+								 p_context.callback,
+								 p_context.log_query,
+								 p_context.save_query,
+								 p_context.cmd_type,
+								 p_context.clear_data,
+								 p_context.tab_title);
 			},
 			function() {
 				cancelSQLTab(p_context.tab_tag);
@@ -267,9 +387,10 @@ function QueryPasswordRequired(p_context, p_message) {
 			p_context.database_index,
 			function() {
 				cancelConsoleTab(p_context.tab_tag);
-				//p_context.tab_tag.editor_input.setValue(p_context.tab_tag.last_command);
-        //p_context.tab_tag.editor_input.clearSelection();
-				//consoleSQL(false);
+				p_context.tab_tag.editor_input.setValue(p_context.tab_tag.last_command);
+        p_context.tab_tag.editor_input.clearSelection();
+				consoleSQL(p_context.check_command,
+									 p_context.mode);
 			},
 			function() {
 				cancelConsoleTab(p_context.tab_tag);

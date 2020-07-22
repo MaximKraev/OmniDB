@@ -20,6 +20,7 @@ from django.contrib.sessions.backends.db import SessionStore
 import sqlparse
 import random
 import string
+import platform
 
 def index(request):
     #Invalid session
@@ -38,6 +39,7 @@ def index(request):
         v_dev_mode = 'true'
     else:
         v_dev_mode = 'false'
+
 
     v_shortcuts = v_session.v_omnidb_database.v_connection.Query('''
         select default_shortcut_code as shortcut_code,
@@ -64,6 +66,10 @@ def index(request):
         where defaults.user_id is null) subquery
     '''.format(v_session.v_user_id))
 
+    v_welcome_closed = v_session.v_omnidb_database.v_connection.ExecuteScalar('''
+        select welcome_closed from users where user_id = {0}
+    '''.format(v_session.v_user_id))
+
     shortcut_object = {}
 
     for v_shortcut in v_shortcuts.Rows:
@@ -76,8 +82,28 @@ def index(request):
             'shortcut_code': v_shortcut['shortcut_code']
         }
 
+
+
+    #if not v_session.v_super_user or platform.system()=='Windows':
+    #    v_show_terminal_option = 'false'
+    #else:
+    #    v_show_terminal_option = 'true'
+    v_show_terminal_option = 'false'
     context = {
-        'session' : v_session,
+        'session' : None,
+        'editor_theme': v_session.v_editor_theme,
+        'theme_type': v_session.v_theme_type,
+        'theme_id': v_session.v_theme_id,
+        'editor_font_size': v_session.v_editor_font_size,
+        'interface_font_size': v_session.v_interface_font_size,
+        'user_id': v_session.v_user_id,
+        'user_key': v_session.v_user_key,
+        'user_name': v_session.v_user_name,
+        'super_user': v_session.v_super_user,
+        'welcome_closed': v_welcome_closed,
+        'enable_omnichat': v_session.v_enable_omnichat,
+        'csv_encoding': v_session.v_csv_encoding,
+        'delimiter': v_session.v_csv_delimiter,
         'desktop_mode': settings.DESKTOP_MODE,
         'omnidb_version': settings.OMNIDB_VERSION,
         'omnidb_short_version': settings.OMNIDB_SHORT_VERSION,
@@ -89,8 +115,9 @@ def index(request):
         'autocomplete': settings.BINDKEY_AUTOCOMPLETE,
         'autocomplete_mac': settings.BINDKEY_AUTOCOMPLETE_MAC,
         'shortcuts': shortcut_object,
-        'chat_link': settings.CHAT_LINK,
-        'tab_token': ''.join(random.choice(string.ascii_lowercase + string.digits) for i in range(20))
+        'tab_token': ''.join(random.choice(string.ascii_lowercase + string.digits) for i in range(20)),
+        'show_terminal_option': v_show_terminal_option,
+        'url_folder': settings.PATH
     }
 
     #wiping tab connection list
@@ -120,6 +147,34 @@ def shortcuts(request):
     template = loader.get_template('OmniDB_app/shortcuts.html')
     return HttpResponse(template.render(context, request))
 
+def close_welcome(request):
+
+    v_return = {}
+    v_return['v_data'] = ''
+    v_return['v_error'] = False
+    v_return['v_error_id'] = -1
+
+    #Invalid session
+    if not request.session.get('omnidb_session'):
+        v_return['v_error'] = True
+        v_return['v_error_id'] = 1
+        return JsonResponse(v_return)
+
+    v_session = request.session.get('omnidb_session')
+
+    try:
+        v_session.v_omnidb_database.v_connection.Execute('''
+        update users
+        set welcome_closed = 1
+        where user_id = {0}
+        '''.format(v_session.v_user_id))
+
+    except Exception as exc:
+        v_return['v_data'] = str(exc)
+        v_return['v_error'] = True
+
+    return JsonResponse(v_return)
+
 def save_config_user(request):
 
     v_return = {}
@@ -138,15 +193,21 @@ def save_config_user(request):
 
     json_object = json.loads(request.POST.get('data', None))
     p_font_size = json_object['p_font_size']
+    p_interface_font_size = json_object['p_interface_font_size']
     p_theme = json_object['p_theme']
     p_pwd = json_object['p_pwd']
     p_chat_enabled = json_object['p_chat_enabled']
+    p_csv_encoding = json_object['p_csv_encoding']
+    p_csv_delimiter = json_object['p_csv_delimiter']
 
     v_session.v_theme_id = p_theme
     v_session.v_editor_font_size = p_font_size
+    v_session.v_interface_font_size = p_interface_font_size
     v_session.v_enable_omnichat = p_chat_enabled
+    v_session.v_csv_encoding = p_csv_encoding
+    v_session.v_csv_delimiter = p_csv_delimiter
 
-    v_enc_pwd = v_cryptor.Encrypt(p_pwd)
+    v_enc_pwd = v_cryptor.Hash(v_cryptor.Encrypt(p_pwd))
 
     v_update_command = ""
     v_query_theme_name = "select theme_name, theme_type from themes where theme_id = " + p_theme
@@ -156,18 +217,24 @@ def save_config_user(request):
             update users
             set theme_id = {0},
             editor_font_size = '{1}',
-            password = '{2}',
-            chat_enabled = {3}
-            where user_id = {4}
-        '''.format(p_theme,p_font_size,v_enc_pwd,p_chat_enabled,v_session.v_user_id)
+            interface_font_size = '{2}',
+            password = '{3}',
+            chat_enabled = {4},
+            csv_encoding = '{5}',
+            csv_delimiter = '{6}'
+            where user_id = {7}
+        '''.format(p_theme,p_font_size,p_interface_font_size,v_enc_pwd,p_chat_enabled,p_csv_encoding,p_csv_delimiter,v_session.v_user_id)
     else:
         v_update_command = '''
             update users
             set theme_id = {0},
             editor_font_size = '{1}',
-            chat_enabled = {2}
-            where user_id = {3}
-        '''.format(p_theme,p_font_size,p_chat_enabled,v_session.v_user_id)
+            interface_font_size = '{2}',
+            chat_enabled = {3},
+            csv_encoding = '{4}',
+            csv_delimiter = '{5}'
+            where user_id = {6}
+        '''.format(p_theme,p_font_size,p_interface_font_size,p_chat_enabled,p_csv_encoding,p_csv_delimiter,v_session.v_user_id)
 
     try:
         v_session.v_omnidb_database.v_connection.Execute(v_update_command)
@@ -252,51 +319,121 @@ def get_database_list(request):
     v_cryptor = request.session.get('cryptor')
 
     v_databases = []
+    v_groups = []
+    v_remote_terminals = []
+    v_options = ''
+
+    #Group list
+    try:
+        v_groups_connections = v_session.v_omnidb_database.v_connection.Query('''
+            select c.cgroup_id as cgroup_id,
+                   c.cgroup_name as cgroup_name,
+                   cc.conn_id as conn_id
+            from cgroups c
+            inner join cgroups_connections cc on c.cgroup_id = cc.cgroup_id
+            where c.user_id = {0}
+            order by c.cgroup_id
+        '''.format(v_session.v_user_id))
+    except Exception as exc:
+        v_return['v_data'] = str(exc)
+        v_return['v_error'] = True
+        return JsonResponse(v_return)
+
+    v_group_list = []
+
+    v_current_group_data = {
+        'v_group_id': 0,
+        'v_name': 'All connections',
+        'conn_list': []
+    }
+    v_groups.append(v_current_group_data)
+    v_options = v_options + '<option value="{0}" data-description="{1} {2}"></option>'.format(v_current_group_data['v_group_id'],"<i class='fas fa-layer-group icon-group'></i>",v_current_group_data['v_name'])
+
+    if len(v_groups_connections.Rows)>0:
+        for r in v_groups_connections.Rows:
+            if v_current_group_data['v_group_id'] != r['cgroup_id']:
+                if v_current_group_data['v_group_id'] != 0:
+                    v_groups.append(v_current_group_data)
+                    v_options = v_options + '<option value="{0}" data-description="{1} {2}"></option>'.format(v_current_group_data['v_group_id'],"<i class='fas fa-layer-group icon-group'></i>",v_current_group_data['v_name'])
+                v_current_group_data = {
+                    'v_group_id': r['cgroup_id'],
+                    'v_name': r['cgroup_name'],
+                    'conn_list': []
+                }
+            if r['conn_id']!=None:
+                v_current_group_data['conn_list'].append(r['conn_id'])
+
+        v_groups.append(v_current_group_data)
+        v_options = v_options + '<option value="{0}" data-description="{1} {2}"></option>'.format(v_current_group_data['v_group_id'],"<i class='fas fa-layer-group icon-group'></i>",v_current_group_data['v_name'])
+
+    v_html_groups = '<select style="width: 100%; font-weight: bold;" onchange="changeGroup(this.value);">{0}</select>'.format(v_options)
+
     v_options = ''
 
     #Connection list
     v_index = 0
     for key,v_database_object in v_session.v_databases.items():
-        v_database = v_database_object['database']
-        v_database_data = {
-            'v_db_type': v_database.v_db_type,
-            'v_alias': v_database.v_alias,
-            'v_conn_id': v_database.v_conn_id,
-            'v_console_help': v_database.v_console_help,
-            'v_database': v_database.v_service
-        }
+        if v_database_object['tunnel']['enabled'] or v_database_object['technology']=='terminal':
+            if v_database_object['alias']!='':
+                v_alias = v_database_object['alias']
+            else:
+                v_alias = v_database_object['tunnel']['user'] + '@' + v_database_object['tunnel']['server'] + ':' + v_database_object['tunnel']['port']
+            v_terminal_object = {
+                'v_conn_id': key,
+                'v_alias': v_alias
+            }
+            v_remote_terminals.append(v_terminal_object)
 
-        v_databases.append(v_database_data)
+        if v_database_object['database']!=None:
+            v_database = v_database_object['database']
 
-        v_alias = '({0}) '.format(v_database.v_alias)
-        if not v_database_object['tunnel']['enabled']:
-            v_details = v_database.PrintDatabaseDetails()
-        else:
-            v_details = v_database_object['database'].v_server + ':' + v_database.v_port + ' <b>(' + v_database_object['tunnel']['server'] + ':' + v_database_object['tunnel']['port'] + ')</b>'
+            if v_database.v_alias=='':
+                v_alias = ''
+            else:
+                v_alias = '({0}) '.format(v_database.v_alias)
+            if not v_database_object['tunnel']['enabled']:
+                v_details = v_database.PrintDatabaseDetails()
+            else:
+                v_details = v_database.PrintDatabaseDetails() + ' <b>(' + v_database_object['tunnel']['server'] + ':' + v_database_object['tunnel']['port'] + ')</b>'
 
-        v_options = v_options + '<option data-image="/static/OmniDB_app/images/{0}_medium.png\" value="{1}" data-description="{2}">{3}{4}</option>'.format(v_database.v_db_type,v_database.v_conn_id,v_details,v_alias,v_database.PrintDatabaseInfo())
-        v_index = v_index + 1
+            v_options = v_options + '<option data-image="' + settings.PATH + '/static/OmniDB_app/images/{0}_medium.png\" value="{1}" data-description="{2}">{3}{4}</option>'.format(v_database.v_db_type,v_database.v_conn_id,v_details,v_alias,v_database.PrintDatabaseInfo())
+            v_index = v_index + 1
 
-    v_html = '<select style="width: 100%; font-weight: bold;" onchange="changeDatabase(this.value);">{0}</select>'.format(v_options)
+            v_database_data = {
+                'v_db_type': v_database.v_db_type,
+                'v_alias': v_database.v_alias,
+                'v_conn_id': v_database.v_conn_id,
+                'v_console_help': v_database.v_console_help,
+                'v_database': v_database.v_active_service,
+                'v_details1': '{0}{1}'.format(v_alias,v_database.PrintDatabaseInfo()),
+                'v_details2': v_details
+            }
+
+            v_databases.append(v_database_data)
+
+    v_html_connections = '<select style="width: 100%; font-weight: bold;" onchange="changeDatabase(this.value);">{0}</select>'.format(v_options)
 
     #retrieving saved tabs
     try:
         v_existing_tabs = []
         v_tabs = v_session.v_omnidb_database.v_connection.Query('''
-            select conn_id,snippet, tab_id
+            select conn_id,snippet, tab_id, title
             from tabs
             where user_id = {0}
             order by conn_id, tab_id
         '''.format(v_session.v_user_id))
         for v_tab in v_tabs.Rows:
-            v_existing_tabs.append({'index': v_tab['conn_id'], 'snippet': v_tab['snippet'], 'tab_db_id': v_tab['tab_id']})
+            v_existing_tabs.append({'index': v_tab['conn_id'], 'snippet': v_tab['snippet'], 'title': v_tab['title'], 'tab_db_id': v_tab['tab_id']})
 
     except Exception as exc:
         None
 
     v_return['v_data'] = {
-        'v_select_html': v_html,
+        'v_select_html': v_html_connections,
+        'v_select_group_html': v_html_groups,
         'v_connections': v_databases,
+        'v_groups': v_groups,
+        'v_remote_terminals': v_remote_terminals,
         'v_id': v_session.v_database_index,
         'v_existing_tabs': v_existing_tabs
     }
@@ -329,14 +466,16 @@ def change_active_database(request):
         v_database.v_db_type,
         v_database.v_connection.v_host,
         str(v_database.v_connection.v_port),
-        v_database.v_service,
-        v_database.v_user,
+        v_database.v_active_service,
+        v_database.v_active_user,
         v_database.v_connection.v_password,
         v_database.v_conn_id,
-        v_database.v_alias
+        v_database.v_alias,
+        p_conn_string = v_database.v_conn_string,
+        p_parse_conn_string = False
     )
 
-    v_database_new.v_service = v_data;
+    v_database_new.v_active_service = v_data;
     v_database_new.v_connection.v_service = v_data;
 
     v_session.v_tab_connections[v_tab_id] = v_database_new
@@ -657,14 +796,14 @@ def alter_table_data(request):
 
                 v_row_data.append(v_pk_table.Rows[0]["constraint_name"])
                 v_row_data.append("Primary Key")
-                v_row_data.append("<img src='/static/OmniDB_app/images/edit_columns.png' class='img_ht' onclick='showColumnSelectionConstraints()'/> " + v_column_list)
+                v_row_data.append("<i title='Select columns' class='fas fa-columns action-grid action-edit-columns' onclick='showColumnSelectionConstraints()'></i> " + v_column_list)
                 v_row_data.append("")
                 v_row_data.append("")
                 v_row_data.append("")
                 v_row_data.append("")
 
                 if v_database.v_can_drop_constraint:
-                    v_row_data.append("<img src='/static/OmniDB_app/images/tab_close.png' class='img_ht' onclick='dropConstraintAlterTable()'/>")
+                    v_row_data.append("<i title='Remove' class='fas fa-times action-grid action-close' onclick='dropConstraintAlterTable()'></i>")
                 else:
                     v_row_data.append("")
 
@@ -706,14 +845,14 @@ def alter_table_data(request):
 
                             v_row_data.append(v_constraint_name)
                             v_row_data.append("Foreign Key")
-                            v_row_data.append("<img src='/static/OmniDB_app/images/edit_columns.png' class='img_ht' onclick='showColumnSelectionConstraints()'/> " + v_column_list)
+                            v_row_data.append("<i title='Select columns' class='fas fa-columns action-grid action-edit-columns' onclick='showColumnSelectionConstraints()'></i> " + v_column_list)
                             v_row_data.append(v_r_table_name)
                             v_row_data.append(v_referenced_column_list)
                             v_row_data.append(v_delete_rule)
                             v_row_data.append(v_update_rule)
 
                             if v_database.v_can_drop_constraint:
-                                v_row_data.append("<img src='/static/OmniDB_app/images/tab_close.png' class='img_ht' onclick='dropConstraintAlterTable()'/>")
+                                v_row_data.append("<i title='Remove' class='fas fa-times action-grid action-close' onclick='dropConstraintAlterTable()'></i>")
                             else:
                                 v_row_data.append("")
 
@@ -745,14 +884,14 @@ def alter_table_data(request):
 
                         v_row_data.append(v_constraint_name)
                         v_row_data.append("Foreign Key")
-                        v_row_data.append("<img src='/static/OmniDB_app/images/edit_columns.png' class='img_ht' onclick='showColumnSelectionConstraints()'/> " + v_column_list)
+                        v_row_data.append("<i title='Select columns' class='fas fa-columns action-grid action-edit-columns' onclick='showColumnSelectionConstraints()'></i> " + v_column_list)
                         v_row_data.append(v_r_table_name)
                         v_row_data.append(v_referenced_column_list)
                         v_row_data.append(v_delete_rule)
                         v_row_data.append(v_update_rule)
 
                         if v_database.v_can_drop_constraint:
-                            v_row_data.append("<img src='/static/OmniDB_app/images/tab_close.png' class='img_ht' onclick='dropConstraintAlterTable()'/>")
+                            v_row_data.append("<i title='Remove' class='fas fa-times action-grid action-close' onclick='dropConstraintAlterTable()'></i>")
                         else:
                             v_row_data.append("")
 
@@ -785,14 +924,14 @@ def alter_table_data(request):
 
                             v_row_data.append(v_constraint_name)
                             v_row_data.append("Unique");
-                            v_row_data.append("<img src='/static/OmniDB_app/images/edit_columns.png' class='img_ht' onclick='showColumnSelectionConstraints()'/> " + v_column_list)
+                            v_row_data.append("<i title='Select columns' class='fas fa-columns action-grid action-edit-columns' onclick='showColumnSelectionConstraints()'></i> " + v_column_list)
                             v_row_data.append("")
                             v_row_data.append("")
                             v_row_data.append("")
                             v_row_data.append("")
 
                             if v_database.v_can_drop_constraint:
-                                v_row_data.append("<img src='/static/OmniDB_app/images/tab_close.png' class='img_ht' onclick='dropConstraintAlterTable()'/>")
+                                v_row_data.append("<i title='Remove' class='fas fa-times action-grid action-close' onclick='dropConstraintAlterTable()'></i>")
                             else:
                                 v_row_data.append("")
 
@@ -813,14 +952,14 @@ def alter_table_data(request):
 
                         v_row_data.append(v_constraint_name)
                         v_row_data.append("Unique")
-                        v_row_data.append("<img src='/static/OmniDB_app/images/edit_columns.png' class='img_ht' onclick='showColumnSelectionConstraints()'/> " + v_column_list)
+                        v_row_data.append("<i title='Select columns' class='fas fa-columns action-grid action-edit-columns' onclick='showColumnSelectionConstraints()'></i> " + v_column_list)
                         v_row_data.append("")
                         v_row_data.append("")
                         v_row_data.append("")
                         v_row_data.append("")
 
                         if v_database.v_can_drop_constraint:
-                            v_row_data.append("<img src='/static/OmniDB_app/images/tab_close.png' class='img_ht' onclick='dropConstraintAlterTable()'/>")
+                            v_row_data.append("<i title='Remove' class='fas fa-times action-grid action-close' onclick='dropConstraintAlterTable()'></i>")
                         else:
                             v_row_data.append("")
 
@@ -856,8 +995,8 @@ def alter_table_data(request):
 
                             v_row_data.append(v_index_name)
                             v_row_data.append(v_uniqueness)
-                            v_row_data.append("<img src='/static/OmniDB_app/images/edit_columns.png' class='img_ht' onclick='showColumnSelectionIndexes()'/> " + v_column_list)
-                            v_row_data.append("<img src='/static/OmniDB_app/images/tab_close.png' class='img_ht' onclick='dropIndexAlterTable()'/>")
+                            v_row_data.append("<i title='Select columns' class='fas fa-columns action-grid action-edit-columns' onclick='showColumnSelectionIndexes()'></i> " + v_column_list)
+                            v_row_data.append("<i title='Remove' class='fas fa-times action-grid action-close' onclick='dropIndexAlterTable()'></i>")
 
                             v_table_indexes.append(v_row_data)
 
@@ -877,8 +1016,8 @@ def alter_table_data(request):
 
                         v_row_data.append(v_index_name)
                         v_row_data.append(v_uniqueness)
-                        v_row_data.append("<img src='/static/OmniDB_app/images/edit_columns.png' class='img_ht' onclick='showColumnSelectionIndexes()'/> " + v_column_list)
-                        v_row_data.append("<img src='/static/OmniDB_app/images/tab_close.png' class='img_ht' onclick='dropIndexAlterTable()'/>")
+                        v_row_data.append("<i title='Select columns' class='fas fa-columns action-grid action-edit-columns' onclick='showColumnSelectionIndexes()'></i> " + v_column_list)
+                        v_row_data.append("<i title='Remove' class='fas fa-times action-grid action-close' onclick='dropIndexAlterTable()'></i>")
 
                         v_table_indexes.append(v_row_data)
 
@@ -1078,7 +1217,7 @@ def save_alter_table(request):
 
                 if v_row['originalNullable'] != p_data_columns [i] [2]:
 
-                    v_command;
+                    v_command = ''
 
                     if p_data_columns [i] [2] == "YES":
                         v_command = v_database.v_set_nullable_command
@@ -1816,28 +1955,75 @@ def get_command_list(request):
 
     json_object = json.loads(request.POST.get('data', None))
     v_current_page = json_object['p_current_page']
+    v_database_index = json_object['p_database_index']
+    v_command_contains = json_object['p_command_contains']
+    v_command_from = json_object['p_command_from']
+    v_command_to = json_object['p_command_to']
 
     v_session = request.session.get('omnidb_session')
 
+    v_database = v_session.v_databases[v_database_index]['database']
 
     try:
-        v_count = v_session.v_omnidb_database.v_connection.ExecuteScalar ('''
-            select count(*)
-            from command_list
+        v_filter = '''\
             where user_id = {0}
-        '''.format(str(v_session.v_user_id)))
+              and conn_id = {1}
+        '''.format(
+            str(v_session.v_user_id),
+            str(v_database.v_conn_id)
+        )
+
+        if v_command_contains is not None and v_command_contains != '':
+            v_filter = '''\
+                {0}
+                  and cl_st_command like '%{1}%'
+            '''.format(
+                v_filter,
+                v_command_contains
+            )
+
+        if v_command_from is not None and v_command_from != '':
+            v_filter = '''\
+                {0}
+                  and date(cl_st_start) >= date('{1}')
+            '''.format(
+                v_filter,
+                v_command_from
+            )
+
+        if v_command_to is not None and v_command_to != '':
+            v_filter = '''\
+                {0}
+                  and date(cl_st_start) <= date('{1}')
+            '''.format(
+                v_filter,
+                v_command_to
+            )
+
+        v_count = v_session.v_omnidb_database.v_connection.ExecuteScalar ('''
+                select count(*)
+                from command_list
+                {0}
+            '''.format(v_filter)
+        )
 
         v_commands = v_session.v_omnidb_database.v_connection.Query ('''
-            select cl_st_start,
-                   cl_st_end,
-                   cl_st_duration,
-                   cl_st_status,
-                   cl_st_command
-            from command_list
-            where user_id = {0}
-            order by cl_in_codigo desc
-            limit {1},{2}
-        '''.format(str(v_session.v_user_id),str((v_current_page-1)*settings.CH_CMDS_PER_PAGE),settings.CH_CMDS_PER_PAGE),True)
+                select cl_st_start,
+                       cl_st_end,
+                       cl_st_duration,
+                       cl_st_status,
+                       cl_st_command
+                from command_list
+                {0}
+                order by cl_in_codigo desc
+                limit {1},{2}
+            '''.format(
+                v_filter,
+                str((v_current_page-1) * settings.CH_CMDS_PER_PAGE),
+                settings.CH_CMDS_PER_PAGE
+            ),
+            True
+        )
     except Exception as exc:
         v_return['v_data'] = str(exc)
         v_return['v_error'] = True
@@ -1849,25 +2035,31 @@ def get_command_list(request):
 
     for v_command in v_commands.Rows:
         v_command_data_list = []
+
         v_command_data_list.append(v_command["cl_st_start"])
         v_command_data_list.append(v_command["cl_st_end"])
         v_command_data_list.append(v_command["cl_st_duration"])
+
         if v_command["cl_st_status"]=='success':
-            v_command_data_list.append('<img src="/static/OmniDB_app/images/status/status_F.png" title="Success"/>')
+            v_command_data_list.append("<i title='Success' class='fas fa-circle action-grid action-status-ok'></i>")
         else:
-            v_command_data_list.append('<img src="/static/OmniDB_app/images/status/status_X.png" title="Error"/>')
+            v_command_data_list.append("<i title='Error' class='fas fa-circle action-grid action-status-error'></i>")
+
         v_command_data_list.append(v_command["cl_st_command"])
-        v_command_data_list.append('<img src="/static/OmniDB_app/images/trigger.png" class="img_ht" title="Open command in new tab" onclick="commandHistoryOpenCmd({0})"/>'.format(index))
+        v_command_data_list.append("<i title='Open command in the current tab' class='fas fa-bolt action-grid action-bolt' onclick='commandHistoryOpenCmd({0})'></i>".format(index))
+
         v_command_list.append(v_command_data_list)
+
         index = index + 1
 
     v_page = ceil(v_count/settings.CH_CMDS_PER_PAGE)
     if v_page==0:
         v_page=1
 
-    v_return['v_data'] = { 'command_list': v_command_list,
-                           'pages': v_page
-                         }
+    v_return['v_data'] = {
+        'commandList': v_command_list,
+        'pages': v_page
+    }
 
     return JsonResponse(v_return)
 
@@ -1884,11 +2076,58 @@ def clear_command_list(request):
         v_return['v_error_id'] = 1
         return JsonResponse(v_return)
 
+    json_object = json.loads(request.POST.get('data', None))
+
+    v_database_index = json_object['p_database_index']
+    v_command_contains = json_object['p_command_contains']
+    v_command_from = json_object['p_command_from']
+    v_command_to = json_object['p_command_to']
+
     v_session = request.session.get('omnidb_session')
 
+    v_database = v_session.v_databases[v_database_index]['database']
 
     try:
-        v_session.v_omnidb_database.v_connection.Execute ("delete from command_list where user_id={0}".format(v_session.v_user_id))
+        v_filter = '''\
+            where user_id = {0}
+              and conn_id = {1}
+        '''.format(
+            str(v_session.v_user_id),
+            str(v_database.v_conn_id)
+        )
+
+        if v_command_contains is not None and v_command_contains != '':
+            v_filter = '''\
+                {0}
+                  and cl_st_command like '%{1}%'
+            '''.format(
+                v_filter,
+                v_command_contains
+            )
+
+        if v_command_from is not None and v_command_from != '':
+            v_filter = '''\
+                {0}
+                  and date(cl_st_start) >= date('{1}')
+            '''.format(
+                v_filter,
+                v_command_from
+            )
+
+        if v_command_to is not None and v_command_to != '':
+            v_filter = '''\
+                {0}
+                  and date(cl_st_start) <= date('{1}')
+            '''.format(
+                v_filter,
+                v_command_to
+            )
+
+        v_session.v_omnidb_database.v_connection.Execute('''
+                delete from command_list
+                {0}
+            '''.format(v_filter)
+        )
     except Exception as exc:
         v_return['v_data'] = str(exc)
         v_return['v_error'] = True
@@ -2029,7 +2268,7 @@ def get_console_history(request):
     try:
         v_units = v_session.v_omnidb_database.v_connection.Query(v_query)
         for v_unit in v_units.Rows:
-            v_actions = '<img src="/static/OmniDB_app/images/select.png" class="img_ht" onclick="consoleHistorySelectCommand()"/>'
+            v_actions = "<i title='Select' class='fas fa-check-circle action-grid action-check' onclick='consoleHistorySelectCommand()'></i>"
 
             v_data.append([v_actions,v_unit['command_date'],v_unit['command_text']])
             v_data_clean.append(v_unit['command_text'])
@@ -2086,5 +2325,160 @@ def get_console_history_clean(request):
         v_return['v_data'] = str(exc)
         v_return['v_error'] = True
         return JsonResponse(v_return)
+
+    return JsonResponse(v_return)
+
+def get_alias(p_sql,p_pos,p_val):
+    try:
+        s = sqlparse.parse(p_sql)
+        v_alias = p_val[:-1]
+        for stmt in s:
+            for item in stmt.tokens:
+                if item.ttype==None:
+                    try:
+                        v_cur_alias = item.get_alias()
+                        if v_cur_alias==None:
+                            if item.value == v_alias:
+                                return item.value
+                        elif v_cur_alias == v_alias:
+                            #check if there is punctuation
+                            if str(item.tokens[1].ttype)!='Token.Punctuation':
+                                return item.get_real_name()
+                            else:
+                                return item.tokens[0].value + '.' + item.tokens[2].value
+                    except:
+                        None
+
+    except Exception as exc:
+        return None
+    return None
+
+
+def get_autocomplete_results(request):
+
+    v_return = {}
+    v_return['v_data'] = ''
+    v_return['v_error'] = False
+    v_return['v_error_id'] = -1
+
+    #Invalid session
+    if not request.session.get('omnidb_session'):
+        v_return['v_error'] = True
+        v_return['v_error_id'] = 1
+        return JsonResponse(v_return)
+
+    v_session = request.session.get('omnidb_session')
+
+    json_object = json.loads(request.POST.get('data', None))
+    v_database_index = json_object['p_database_index']
+    v_tab_id = json_object['p_tab_id']
+    v_sql = json_object['p_sql']
+    v_value = json_object['p_value']
+    v_pos = json_object['p_pos']
+    v_num_dots = v_value.count('.')
+
+    v_database = v_session.v_tab_connections[v_tab_id]
+
+    #Check database prompt timeout
+    v_timeout = v_session.DatabaseReachPasswordTimeout(int(v_database_index))
+    if v_timeout['timeout']:
+        v_return['v_data'] = {'password_timeout': True, 'message': v_timeout['message'] }
+        v_return['v_error'] = True
+        return JsonResponse(v_return)
+
+    v_result = []
+    max_result_word = ''
+    max_complement_word = ''
+
+    v_alias = None
+    if v_value!='' and v_value[len(v_value)-1]=='.':
+        v_alias = get_alias(v_sql,v_pos,v_value)
+        if v_alias:
+            try:
+                v_data1 = v_database.v_connection.GetFields ("select x.* from " + v_alias + " x where 1 = 0")
+                v_current_group = { 'type': 'column', 'elements': [] }
+                max_result_length = 0
+                max_complement_length = 0
+                for v_type in v_data1:
+                    curr_result_length = len(v_value + v_type.v_truename)
+                    curr_complement_length = len(v_type.v_dbtype)
+                    curr_result_word = v_value + v_type.v_truename
+                    curr_complement_word = v_type.v_dbtype
+
+                    if curr_result_length > max_result_length:
+                        max_result_length = curr_result_length
+                        max_result_word = curr_result_word
+                    if curr_complement_length > max_complement_length:
+                        max_complement_length = curr_complement_length
+                        max_complement_word = curr_complement_word
+
+                    v_current_group['elements'].append({ 'value': v_value + v_type.v_truename, 'select_value': v_value + v_type.v_truename, 'complement': v_type.v_dbtype})
+                if len(v_current_group['elements']) > 0:
+                    v_result.append(v_current_group)
+            except Exception as exc:
+                None
+
+    if not v_alias:
+        v_filter = '''where search.result like '{0}%' '''.format(v_value)
+        v_query_columns = 'type,sequence,result,select_value,complement'
+        if v_num_dots > 0:
+            v_filter = '''where search.result_complete like '{0}%' and search.num_dots <= {1}'''.format(v_value,v_num_dots)
+            v_query_columns = 'type,sequence,result_complete as result,select_value,complement_complete as complement'
+        elif v_value=='':
+            v_filter = '''where search.num_dots = 0 '''
+
+        try:
+            max_result_length = 0
+            max_complement_length = 0
+
+            v_search = v_database.GetAutocompleteValues(v_query_columns,v_filter)
+
+            if v_search!=None:
+                v_current_group = { 'type': '', 'elements': [] }
+                if len(v_search.Rows) > 0:
+                    v_current_group['type'] = v_search.Rows[0]['type']
+                for v_search_row in v_search.Rows:
+
+                    if v_current_group['type'] != v_search_row['type']:
+                        v_result.append(v_current_group)
+                        v_current_group = { 'type': v_search_row['type'], 'elements': [] }
+
+                    curr_result_length = len(v_search_row['result'])
+                    curr_complement_length = len(v_search_row['complement'])
+                    curr_result_word = v_search_row['result']
+                    curr_complement_word = v_search_row['complement']
+                    v_current_group['elements'].append({ 'value': v_search_row['result'], 'select_value': v_search_row['select_value'],'complement': v_search_row['complement']})
+
+                    if curr_result_length > max_result_length:
+                        max_result_length = curr_result_length
+                        max_result_word = curr_result_word
+                    if curr_complement_length > max_complement_length:
+                        max_complement_length = curr_complement_length
+                        max_complement_word = curr_complement_word
+
+                if len(v_current_group['elements']) > 0:
+                    v_result.append(v_current_group)
+
+        except Exception as exc:
+            v_return['v_data'] = {'password_timeout': True, 'message': str(exc) }
+            v_return['v_error'] = True
+            return JsonResponse(v_return)
+
+    #get reserved words list if there are no dots
+    if v_num_dots == 0:
+        v_reserved_words_list = v_database.v_reserved_words
+        v_value_upper = v_value.upper()
+        v_filtered_words_list = [k for k in v_reserved_words_list if k.startswith(v_value_upper)]
+        v_current_group = { 'type': 'keyword', 'elements': [] }
+        for v_filtered_word in v_filtered_words_list:
+            v_current_group['elements'].append({ 'value': v_filtered_word, 'select_value': v_filtered_word, 'complement': ''})
+        if len(v_current_group['elements']) > 0:
+            v_result.append(v_current_group)
+
+    v_return['v_data'] = {
+                            'data': v_result,
+                            'max_result_word': max_result_word,
+                            'max_complement_word': max_complement_word
+                        }
 
     return JsonResponse(v_return)

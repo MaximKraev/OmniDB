@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime,timedelta
 from django.contrib.sessions.backends.db import SessionStore
 from OmniDB import settings
+from OmniDB import custom_settings
 import sys
 sys.path.append('OmniDB_app/include')
 import paramiko
@@ -13,6 +14,10 @@ from sshtunnel import SSHTunnelForwarder
 import socket
 import time
 import os
+from collections import OrderedDict
+
+import logging
+logger = logging.getLogger('OmniDB_app.Session')
 
 tunnels = dict([])
 
@@ -30,10 +35,13 @@ class Session(object):
                 p_theme_type,
                 p_theme_id,
                 p_editor_font_size,
+                p_interface_font_size,
                 p_enable_omnichat,
                 p_super_user,
                 p_cryptor,
-                p_user_key):
+                p_user_key,
+                p_csv_encoding,
+                p_csv_delimiter):
         self.v_user_id = p_user_id
         self.v_user_name = p_user_name
         self.v_omnidb_database = p_omnidb_database
@@ -41,29 +49,37 @@ class Session(object):
         self.v_theme_type = p_theme_type
         self.v_theme_id = p_theme_id
         self.v_editor_font_size = p_editor_font_size
+        self.v_interface_font_size = p_interface_font_size
         self.v_enable_omnichat = p_enable_omnichat
         self.v_super_user = p_super_user
         self.v_cryptor = p_cryptor
         self.v_database_index = -1
-        self.v_databases = {}
+        self.v_databases = OrderedDict()
         self.v_user_key = p_user_key
+        self.v_csv_encoding = p_csv_encoding
+        self.v_csv_delimiter = p_csv_delimiter
         self.v_tab_connections = dict([])
 
         self.RefreshDatabaseList()
 
     def AddDatabase(self,
-                    p_database,
-                    p_prompt_password,
-                    p_tunnel_information = None):
+                    p_conn_id = None,
+                    p_technology = None,
+                    p_database = None,
+                    p_prompt_password = True,
+                    p_tunnel_information = None,
+                    p_alias = None):
         if len(self.v_databases)==0:
             self.v_database_index = 0
 
-        self.v_databases[p_database.v_conn_id] = {
+        self.v_databases[p_conn_id] = {
                                 'database': p_database,
                                 'prompt_password': p_prompt_password,
                                 'prompt_timeout': None,
                                 'tunnel': p_tunnel_information,
-                                'tunnel_object': None
+                                'tunnel_object': None,
+                                'alias': p_alias,
+                                'technology': p_technology
                                 }
 
     def DatabaseReachPasswordTimeout(self,p_database_index):
@@ -96,14 +112,16 @@ class Session(object):
                                 ssh_username=self.v_databases[p_database_index]['tunnel']['user'],
                                 ssh_private_key_password=self.v_databases[p_database_index]['tunnel']['password'],
                                 ssh_pkey = v_full_file_name,
-                                remote_bind_address=(self.v_databases[p_database_index]['database'].v_server, int(self.v_databases[p_database_index]['database'].v_port))
+                                remote_bind_address=(self.v_databases[p_database_index]['database'].v_active_server, int(self.v_databases[p_database_index]['database'].v_active_port)),
+                                logger=logger
                             )
                         else:
                             server = SSHTunnelForwarder(
                                 (self.v_databases[p_database_index]['tunnel']['server'], int(self.v_databases[p_database_index]['tunnel']['port'])),
                                 ssh_username=self.v_databases[p_database_index]['tunnel']['user'],
                                 ssh_password=self.v_databases[p_database_index]['tunnel']['password'],
-                                remote_bind_address=(self.v_databases[p_database_index]['database'].v_server, int(self.v_databases[p_database_index]['database'].v_port))
+                                remote_bind_address=(self.v_databases[p_database_index]['database'].v_active_server, int(self.v_databases[p_database_index]['database'].v_active_port)),
+                                logger=logger
                             )
                         server.set_keepalive = 120
                         server.start()
@@ -129,7 +147,7 @@ class Session(object):
                     except Exception as exc:
                         return { 'timeout': True, 'message': str(exc)}
             #Reached timeout, must request password
-            if not self.v_databases[p_database_index]['prompt_timeout'] or datetime.now() > self.v_databases[p_database_index]['prompt_timeout'] + timedelta(0,settings.PWD_TIMEOUT_TOTAL):
+            if not self.v_databases[p_database_index]['prompt_timeout'] or datetime.now() > self.v_databases[p_database_index]['prompt_timeout'] + timedelta(0,custom_settings.PWD_TIMEOUT_TOTAL):
                 #Try passwordless connection
                 self.v_databases[p_database_index]['database'].v_connection.v_password = ''
                 v_test = self.v_databases[p_database_index]['database'].TestConnection()
@@ -183,6 +201,10 @@ class Session(object):
                 v_alias = self.v_cryptor.Decrypt(r["alias"])
             except Exception as exc:
                 v_alias = r["alias"]
+            try:
+                v_conn_string = self.v_cryptor.Decrypt(r["conn_string"])
+            except Exception as exc:
+                v_conn_string = r["conn_string"]
 
             #SSH Tunnel information
             try:
@@ -229,13 +251,15 @@ class Session(object):
 				v_user,
                 '',
                 r["conn_id"],
-                v_alias
+                v_alias,
+                p_conn_string = v_conn_string,
+                p_parse_conn_string = True
             )
 
             if 1==0:
-                self.AddDatabase(database,False,tunnel_information)
+                self.AddDatabase(r["conn_id"],r["dbt_st_name"],database,False,tunnel_information,v_alias)
             else:
-                self.AddDatabase(database,True,tunnel_information)
+                self.AddDatabase(r["conn_id"],r["dbt_st_name"],database,True,tunnel_information,v_alias)
 
     def Execute(self,
                 p_database,

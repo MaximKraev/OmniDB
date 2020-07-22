@@ -1,13 +1,26 @@
 /*
-Copyright 2015-2017 The OmniDB Team
+The MIT License (MIT)
 
-This file is part of OmniDB.
+Portions Copyright (c) 2015-2019, The OmniDB Team
+Portions Copyright (c) 2017-2019, 2ndQuadrant Limited
 
-OmniDB is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-OmniDB is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-You should have received a copy of the GNU General Public License along with OmniDB. If not, see http://www.gnu.org/licenses/.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 */
 
 /// <summary>
@@ -31,7 +44,7 @@ function createWebSocket(p_address, p_port, p_onOpen, p_onMessage, p_onClose, p_
 		v_port = p_port;
 	}
 
-	var v_connection = new WebSocket(p_address + ':' + v_port + '/' + p_channel);
+	var v_connection = new WebSocket(p_address + ':' + v_port + v_url_folder + '/' + p_channel);
 
 	if(p_onOpen != null && typeof p_onOpen == 'function') {
 		v_connection.onopen = p_onOpen;
@@ -80,6 +93,18 @@ function createWebSocket(p_address, p_port, p_onOpen, p_onMessage, p_onClose, p_
 	return v_connection;
 }
 
+function createContext(p_connection, p_context) {
+	p_connection.contextCode += 1;
+	v_context_code = p_connection.contextCode;
+	p_context.v_context_code = v_context_code;
+	var v_context = {
+		code: v_context_code,
+		context: p_context
+	}
+	p_connection.contextList.push(v_context);
+	return v_context;
+}
+
 function removeContext(p_connection, p_context_code) {
 	for (var i=0; i<p_connection.contextList.length; i++) {
 		if (p_connection.contextList[i].code == p_context_code) {
@@ -103,14 +128,21 @@ function sendWebSocketMessage(p_connection, p_messageCode, p_messageData, p_erro
 
 	//Configuring context
 	if (p_context!=null) {
-		p_connection.contextCode += 1;
-		v_context_code = p_connection.contextCode;
-		p_context.v_context_code = v_context_code;
-		var v_context = {
-			code: v_context_code,
-			context: p_context
+
+		//Context code is passed
+		if (p_context === parseInt(p_context, 10)) {
+			v_context_code = p_context;
 		}
-		p_connection.contextList.push(v_context);
+		else {
+			p_connection.contextCode += 1;
+			v_context_code = p_connection.contextCode;
+			p_context.v_context_code = v_context_code;
+			var v_context = {
+				code: v_context_code,
+				context: p_context
+			}
+			p_connection.contextList.push(v_context);
+		}
 	}
 
 	waitForSocketConnection(
